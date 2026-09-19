@@ -12,7 +12,9 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -203,16 +205,23 @@ private fun OnboardingScreen(
             progress = (stepIndex + 1) / totalSteps.toFloat(),
             modifier = Modifier.fillMaxWidth()
         )
-        Spacer(Modifier.weight(1f))
+        Spacer(Modifier.weight(0.8f))
         AnimatedContent(targetState = step, label = "onboard-step") { current ->
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Icon(
-                    current.icon,
-                    contentDescription = null,
-                    modifier = Modifier.size(72.dp),
-                    tint = MaterialTheme.colorScheme.primary
-                )
-                Spacer(Modifier.height(24.dp))
+                Box(
+                    modifier = Modifier
+                        .size(96.dp)
+                        .background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        current.icon,
+                        contentDescription = null,
+                        modifier = Modifier.size(48.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+                Spacer(Modifier.height(28.dp))
                 Text(
                     current.title,
                     style = MaterialTheme.typography.headlineSmall,
@@ -228,7 +237,7 @@ private fun OnboardingScreen(
                 )
             }
         }
-        Spacer(Modifier.weight(1f))
+        Spacer(Modifier.weight(1.2f))
         Button(onClick = onAction, modifier = Modifier.fillMaxWidth()) {
             Text(step.actionLabel)
         }
