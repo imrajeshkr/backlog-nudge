@@ -12,6 +12,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.WarningAmber
@@ -29,11 +30,15 @@ import com.backlognudge.app.data.BacklogItem
 import com.backlognudge.app.data.EnergyLevel
 import com.backlognudge.app.data.ItemCategory
 import com.backlognudge.app.data.ItemStatus
+import com.backlognudge.app.data.NudgeEvent
+import com.backlognudge.app.data.NudgeResponse
 import com.backlognudge.app.data.TimeEstimate
 import com.backlognudge.app.detection.UsageTracker
+import com.backlognudge.app.detection.WatchedApps
 import com.backlognudge.app.prefs.AppPrefs
 import com.backlognudge.app.ui.components.ItemEditDialog
 import com.backlognudge.app.ui.theme.BacklogNudgeTheme
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
@@ -63,7 +68,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun MainScreen(prefs: AppPrefs) {
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -72,6 +77,9 @@ fun MainScreen(prefs: AppPrefs) {
 
     val items by db.backlogDao().observeAll().collectAsState(initial = emptyList())
     val watcherEnabled by prefs.watcherEnabled.collectAsState(initial = false)
+    val watchedPackages by prefs.watchedPackages.collectAsState(initial = WatchedApps.DEFAULT_PACKAGES)
+    val recentNudges by db.nudgeDao().observeRecent().collectAsState(initial = emptyList())
+    val lastHeartbeat by prefs.lastHeartbeat.collectAsState(initial = 0L)
 
     val usageTracker = remember { UsageTracker(context) }
     val hasUsageAccess = remember { mutableStateOf(usageTracker.hasUsageAccess()) }
@@ -87,14 +95,32 @@ fun MainScreen(prefs: AppPrefs) {
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
+    // Ticks so the stale-heartbeat check below re-evaluates against "now" even
+    // though nothing in the datastore itself is changing - otherwise a dead
+    // background service would stay silently unreported.
+    var now by remember { mutableStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(10_000)
+            now = System.currentTimeMillis()
+        }
+    }
+    val watcherLooksDead = watcherEnabled && hasUsageAccess.value &&
+        AppPrefs.isHeartbeatStale(lastHeartbeat, now)
+    val noWatchedAppInstalled = watcherEnabled && WatchedApps.noneInstalled(context, watchedPackages)
+
     var showAddDialog by remember { mutableStateOf(false) }
     var editingItem by remember { mutableStateOf<BacklogItem?>(null) }
+    var showNudgeHistory by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.app_name), fontWeight = FontWeight.SemiBold) },
                 actions = {
+                    IconButton(onClick = { showNudgeHistory = !showNudgeHistory }) {
+                        Icon(Icons.Filled.History, contentDescription = "Nudge history")
+                    }
                     IconButton(onClick = {
                         context.startActivity(Intent(context, SettingsActivity::class.java))
                     }) {
@@ -119,6 +145,21 @@ fun MainScreen(prefs: AppPrefs) {
                     context.startActivity(Intent(context, SettingsActivity::class.java))
                 }
             }
+            AnimatedVisibility(visible = watcherEnabled && hasUsageAccess.value && watcherLooksDead) {
+                StatusBanner(
+                    text = "The background watcher seems to have stopped — likely your phone's battery saver killed it. Exempt Backlog Nudge in Settings to keep nudges reliable.",
+                    actionLabel = "Fix in Settings"
+                ) {
+                    context.startActivity(Intent(context, SettingsActivity::class.java))
+                }
+            }
+            AnimatedVisibility(visible = noWatchedAppInstalled) {
+                StatusBanner(
+                    text = "None of the apps you're watching (${WatchedApps.friendlyName(WatchedApps.INSTAGRAM)}) are installed on this device, so watching won't trigger any nudges.",
+                    actionLabel = "Dismiss",
+                    onAction = {}
+                )
+            }
             AnimatedVisibility(visible = !watcherEnabled) {
                 StatusBanner(
                     text = "Scroll-session watching is off — you'll only get nudges you trigger yourself.",
@@ -126,6 +167,9 @@ fun MainScreen(prefs: AppPrefs) {
                 ) {
                     context.startActivity(Intent(context, SettingsActivity::class.java))
                 }
+            }
+            AnimatedVisibility(visible = showNudgeHistory) {
+                NudgeHistorySection(recentNudges = recentNudges, items = items)
             }
 
             val openItems = items.filter { it.status == ItemStatus.OPEN }
@@ -137,6 +181,7 @@ fun MainScreen(prefs: AppPrefs) {
                     items(openItems, key = { it.id }) { item ->
                         BacklogItemRow(
                             item = item,
+                            modifier = Modifier.animateItemPlacement(),
                             onClick = { editingItem = item },
                             onDone = { scope.launch { db.backlogDao().markDone(item.id) } },
                             onDelete = { scope.launch { db.backlogDao().delete(item.id) } }
@@ -190,6 +235,50 @@ private fun StatusBanner(text: String, actionLabel: String, onAction: () -> Unit
 }
 
 @Composable
+private fun NudgeHistorySection(recentNudges: List<NudgeEvent>, items: List<BacklogItem>) {
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
+        shape = MaterialTheme.shapes.medium
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text("Recent nudges", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(8.dp))
+            if (recentNudges.isEmpty()) {
+                Text(
+                    "No nudges yet — once you've got backlog items and spend a while in a watched app, they'll show up here.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            } else {
+                recentNudges.take(8).forEach { event ->
+                    val title = items.firstOrNull { it.id == event.itemId }?.title ?: "(deleted item)"
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(title, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                        Text(
+                            responseLabel(event.response),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun responseLabel(response: NudgeResponse): String = when (response) {
+    NudgeResponse.DID_IT -> "Done"
+    NudgeResponse.SNOOZED -> "Snoozed"
+    NudgeResponse.DISMISSED -> "Not today"
+    NudgeResponse.REMOVED -> "Removed"
+    NudgeResponse.PENDING -> "Pending"
+}
+
+@Composable
 private fun EmptyState(onAddManually: () -> Unit) {
     Column(
         modifier = Modifier.fillMaxSize().padding(32.dp),
@@ -218,11 +307,12 @@ private fun EmptyState(onAddManually: () -> Unit) {
 @Composable
 private fun BacklogItemRow(
     item: BacklogItem,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit,
     onDone: () -> Unit,
     onDelete: () -> Unit
 ) {
-    ElevatedCard(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
+    ElevatedCard(onClick = onClick, modifier = modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.padding(16.dp).fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically

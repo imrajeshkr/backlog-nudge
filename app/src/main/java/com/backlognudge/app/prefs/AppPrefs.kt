@@ -68,5 +68,17 @@ class AppPrefs(private val context: Context) {
 
     companion object {
         const val DEFAULT_THRESHOLD_MINUTES = 15
+
+        /**
+         * The watcher polls every ~5s (see ForegroundWatcherService.POLL_INTERVAL_MS).
+         * If we haven't seen a heartbeat in several multiples of that, the OS has
+         * almost certainly killed the background service (a battery-optimization
+         * side effect) rather than it just being mid-poll - worth surfacing to the
+         * user instead of nudges silently stopping.
+         */
+        const val HEARTBEAT_STALE_MS = 60_000L
+
+        fun isHeartbeatStale(lastHeartbeat: Long, now: Long = System.currentTimeMillis()): Boolean =
+            lastHeartbeat > 0L && (now - lastHeartbeat) > HEARTBEAT_STALE_MS
     }
 }
