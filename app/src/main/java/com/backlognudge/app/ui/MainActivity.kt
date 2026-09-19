@@ -10,7 +10,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Mic
@@ -351,7 +351,7 @@ private fun BacklogItemRow(
                 AssistRowChips(item)
             }
             IconButton(onClick = onDone) {
-                Icon(Icons.Filled.CheckCircle, contentDescription = "Mark done", tint = MaterialTheme.colorScheme.primary)
+                Icon(Icons.Outlined.CheckCircle, contentDescription = "Mark done", tint = MaterialTheme.colorScheme.primary)
             }
             IconButton(onClick = onDelete) {
                 Icon(Icons.Filled.Delete, contentDescription = "Delete")
