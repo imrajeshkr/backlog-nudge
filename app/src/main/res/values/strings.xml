@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">Backlog Nudge</string>
+    <string name="tile_label">Capture item</string>
+</resources>
