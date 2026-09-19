@@ -112,6 +112,10 @@ fun MainScreen(prefs: AppPrefs) {
     var showAddDialog by remember { mutableStateOf(false) }
     var editingItem by remember { mutableStateOf<BacklogItem?>(null) }
     var showNudgeHistory by remember { mutableStateOf(false) }
+    var notInstalledDismissed by remember { mutableStateOf(false) }
+    val launchVoiceCapture = {
+        context.startActivity(Intent(context, com.backlognudge.app.capture.VoiceCaptureActivity::class.java))
+    }
 
     Scaffold(
         topBar = {
@@ -130,8 +134,14 @@ fun MainScreen(prefs: AppPrefs) {
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = { showAddDialog = true }) {
-                Icon(Icons.Filled.Add, contentDescription = "Add item")
+            Column(horizontalAlignment = Alignment.End) {
+                SmallFloatingActionButton(onClick = launchVoiceCapture) {
+                    Icon(Icons.Filled.Mic, contentDescription = "Speak a backlog item")
+                }
+                Spacer(Modifier.height(12.dp))
+                FloatingActionButton(onClick = { showAddDialog = true }) {
+                    Icon(Icons.Filled.Add, contentDescription = "Add item")
+                }
             }
         }
     ) { padding ->
@@ -153,11 +163,11 @@ fun MainScreen(prefs: AppPrefs) {
                     context.startActivity(Intent(context, SettingsActivity::class.java))
                 }
             }
-            AnimatedVisibility(visible = noWatchedAppInstalled) {
+            AnimatedVisibility(visible = noWatchedAppInstalled && !notInstalledDismissed) {
                 StatusBanner(
                     text = "${WatchedApps.friendlyName(WatchedApps.INSTAGRAM)} isn't installed here, so this device won't get nudges.",
                     actionLabel = "Dismiss",
-                    onAction = {}
+                    onAction = { notInstalledDismissed = true }
                 )
             }
             AnimatedVisibility(visible = !watcherEnabled) {
@@ -175,7 +185,7 @@ fun MainScreen(prefs: AppPrefs) {
             val openItems = items.filter { it.status == ItemStatus.OPEN }
 
             if (openItems.isEmpty()) {
-                EmptyState(onAddManually = { showAddDialog = true })
+                EmptyState(onSpeak = launchVoiceCapture, onAddManually = { showAddDialog = true })
             } else {
                 LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     items(openItems, key = { it.id }) { item ->
@@ -279,7 +289,7 @@ private fun responseLabel(response: NudgeResponse): String = when (response) {
 }
 
 @Composable
-private fun EmptyState(onAddManually: () -> Unit) {
+private fun EmptyState(onSpeak: () -> Unit, onAddManually: () -> Unit) {
     Column(
         modifier = Modifier.fillMaxSize().padding(32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -290,12 +300,18 @@ private fun EmptyState(onAddManually: () -> Unit) {
         Text("Your backlog is empty", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
         Spacer(Modifier.height(8.dp))
         Text(
-            "Pull down Quick Settings and tap the “Capture item” tile from anywhere — say what's on your mind and it lands here automatically.",
+            "Tap below and say what's on your mind — it lands here automatically. (Tip: the mic icon also lives as a Quick Settings tile, so you can speak an item from anywhere without opening the app.)",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = androidx.compose.ui.text.style.TextAlign.Center
         )
         Spacer(Modifier.height(20.dp))
+        Button(onClick = onSpeak) {
+            Icon(Icons.Filled.Mic, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Text("Speak a backlog item")
+        }
+        Spacer(Modifier.height(10.dp))
         OutlinedButton(onClick = onAddManually) {
             Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))

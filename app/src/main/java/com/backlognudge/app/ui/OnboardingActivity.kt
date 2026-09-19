@@ -45,10 +45,6 @@ class OnboardingActivity : ComponentActivity() {
     private lateinit var usageTracker: UsageTracker
     private lateinit var prefs: AppPrefs
 
-    private val micPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { advance() }
-
     private val notifPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { advance() }
@@ -66,7 +62,7 @@ class OnboardingActivity : ComponentActivity() {
                 OnboardStep(
                     Icons.Filled.Bolt,
                     "Let's set you up",
-                    "Backlog Nudge needs a few permissions to work: to notice when you've been scrolling, to hear your voice, and to nudge you reliably. This takes under a minute — we'll explain each one before asking.",
+                    "Backlog Nudge needs a couple of permissions to work: to notice when you've been scrolling, and to nudge you reliably. This takes under a minute — we'll explain each one before asking. (We'll ask for the microphone separately, the first time you actually speak an item.)",
                     "Let's go"
                 )
             )
@@ -84,14 +80,6 @@ class OnboardingActivity : ComponentActivity() {
                     "Stay awake in the background",
                     "Some phones aggressively kill background apps to save battery, which would silently stop your nudges. Exempting Backlog Nudge keeps the watcher running reliably.",
                     "Allow in battery settings"
-                )
-            )
-            add(
-                OnboardStep(
-                    Icons.Filled.Mic,
-                    "Hear you out",
-                    "Tap the Quick Settings tile anytime to speak a backlog item — speech-to-text happens on your device, and only the resulting text is sent off-device for structuring.",
-                    "Allow microphone"
                 )
             )
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -155,15 +143,8 @@ class OnboardingActivity : ComponentActivity() {
                 }
                 advance()
             }
-            3 -> {
-                if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
-                    advance()
-                } else {
-                    micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-                }
-            }
             else -> {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && stepIndex == 4) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && stepIndex == 3) {
                     if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) {
                         advance()
                     } else {
@@ -241,7 +222,7 @@ private fun OnboardingScreen(
         Button(onClick = onAction, modifier = Modifier.fillMaxWidth()) {
             Text(step.actionLabel)
         }
-        if (stepIndex in 1..3) {
+        if (stepIndex in 1 until totalSteps - 1) {
             Spacer(Modifier.height(8.dp))
             TextButton(onClick = onSkip) { Text("Skip for now") }
         }
