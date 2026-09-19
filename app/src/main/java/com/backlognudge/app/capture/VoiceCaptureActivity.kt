@@ -17,6 +17,7 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -27,15 +28,16 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.lifecycleScope
 import com.backlognudge.app.BacklogNudgeApp
 import com.backlognudge.app.prefs.AppPrefs
+import com.backlognudge.app.ui.theme.BacklogNudgeTheme
+import com.backlognudge.app.ui.theme.TitleSerif
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -194,35 +196,45 @@ private fun VoiceCaptureScreen(
     partial: String,
     onCancel: () -> Unit
 ) {
-    Dialog(onDismissRequest = onCancel, properties = DialogProperties(dismissOnClickOutside = true)) {
-        Surface(
-            shape = RoundedCornerShape(28.dp),
-            color = Color(0xFF1C1730),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(
-                modifier = Modifier.padding(28.dp).fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally
+    BacklogNudgeTheme {
+        Dialog(onDismissRequest = onCancel, properties = DialogProperties(dismissOnClickOutside = true)) {
+            Surface(
+                shape = RoundedCornerShape(24.dp),
+                color = MaterialTheme.colorScheme.surface,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                modifier = Modifier.fillMaxWidth()
             ) {
-                PulsingMicIcon(active = state == CaptureState.LISTENING)
-                Spacer(Modifier.height(20.dp))
-                Text(
-                    text = message,
-                    color = Color.White,
-                    fontWeight = FontWeight.Medium,
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                )
-                if (state == CaptureState.LISTENING && partial.isNotBlank()) {
-                    Spacer(Modifier.height(8.dp))
+                Column(
+                    modifier = Modifier.padding(28.dp).fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    // The mic is "going" — this is the one green thing on the sheet.
+                    PulsingMicIcon(active = state == CaptureState.LISTENING)
+                    Spacer(Modifier.height(20.dp))
                     Text(
-                        text = "“$partial”",
-                        color = Color(0xFFB8AEEA),
+                        text = message,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        style = MaterialTheme.typography.bodyLarge,
                         textAlign = androidx.compose.ui.text.style.TextAlign.Center
                     )
-                }
-                if (state == CaptureState.PROCESSING) {
-                    Spacer(Modifier.height(16.dp))
-                    CircularProgressIndicator(color = Color(0xFF9C8CFF), modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                    if (partial.isNotBlank() && state != CaptureState.ERROR) {
+                        Spacer(Modifier.height(10.dp))
+                        // What the user said, in the user's voice: serif.
+                        Text(
+                            text = partial,
+                            style = TitleSerif.copy(fontSize = 19.sp),
+                            color = MaterialTheme.colorScheme.onSurface,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        )
+                    }
+                    if (state == CaptureState.PROCESSING) {
+                        Spacer(Modifier.height(16.dp))
+                        CircularProgressIndicator(
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(18.dp),
+                            strokeWidth = 2.dp
+                        )
+                    }
                 }
             }
         }
@@ -234,17 +246,17 @@ private fun PulsingMicIcon(active: Boolean) {
     val transition = rememberInfiniteTransition(label = "mic-pulse")
     val scale by transition.animateFloat(
         initialValue = 1f,
-        targetValue = if (active) 1.25f else 1f,
-        animationSpec = infiniteRepeatable(tween(700, easing = LinearEasing), RepeatMode.Reverse),
+        targetValue = if (active) 1.18f else 1f,
+        animationSpec = infiniteRepeatable(tween(760, easing = LinearEasing), RepeatMode.Reverse),
         label = "scale"
     )
     Box(
         modifier = Modifier
-            .size(64.dp)
+            .size(60.dp)
             .graphicsLayer { scaleX = scale; scaleY = scale }
-            .background(Color(0xFF5B4FE9), CircleShape),
+            .background(MaterialTheme.colorScheme.primary, CircleShape),
         contentAlignment = Alignment.Center
     ) {
-        Icon(Icons.Filled.Mic, contentDescription = null, tint = Color.White)
+        Icon(Icons.Filled.Mic, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimary)
     }
 }

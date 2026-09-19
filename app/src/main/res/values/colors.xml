@@ -1,6 +1,6 @@
 <resources>
-    <color name="brand_primary">#5B4FE9</color>
-    <color name="brand_primary_dark">#3E33B8</color>
-    <color name="brand_bg">#FFFFFF</color>
-    <color name="brand_bg_dark">#121016</color>
+    <!-- "Green Light": achromatic shell. Green is reserved for going + finishing,
+         and is applied in Compose (see ui/theme/Theme.kt), never as window chrome. -->
+    <color name="bg_night">#0C100E</color>
+    <color name="bg_paper">#F1EFE8</color>
 </resources>
