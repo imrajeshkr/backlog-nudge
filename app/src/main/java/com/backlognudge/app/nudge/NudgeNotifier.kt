@@ -56,7 +56,7 @@ object NudgeNotifier {
             // Capped at 3 quick actions - most launchers only render three on a collapsed
             // heads-up/notification-shade view regardless of how many are added. "Not today"
             // is still reachable one tap deeper, inside the expanded bubble/sheet.
-            .addAction(action(context, "Leave", R.drawable.ic_action_close, NudgeActionReceiver.ACTION_LEAVE, item.id, eventId))
+            .addAction(leaveAction(context, item.id, eventId, notificationId))
             .addAction(action(context, "Done", R.drawable.ic_action_check, NudgeActionReceiver.ACTION_DONE, item.id, eventId))
             .addAction(action(context, "Snooze 30m", R.drawable.ic_action_snooze, NudgeActionReceiver.ACTION_SNOOZE, item.id, eventId))
 
@@ -138,6 +138,21 @@ object NudgeNotifier {
         },
         PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
     )
+
+    // Deliberately an activity-launch PendingIntent, not a broadcast one - see
+    // LeaveAppActivity for why a plain BroadcastReceiver can't do this reliably.
+    private fun leaveAction(context: Context, itemId: Long, eventId: Long, notificationId: Int): NotificationCompat.Action {
+        val intent = Intent(context, LeaveAppActivity::class.java).apply {
+            putExtra(LeaveAppActivity.EXTRA_ITEM_ID, itemId)
+            putExtra(LeaveAppActivity.EXTRA_EVENT_ID, eventId)
+        }
+        val pendingIntent = PendingIntent.getActivity(
+            context, notificationId + 1,
+            intent,
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+        return NotificationCompat.Action.Builder(R.drawable.ic_action_close, "Let's go", pendingIntent).build()
+    }
 
     private fun action(
         context: Context,

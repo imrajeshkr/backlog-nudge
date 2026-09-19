@@ -19,10 +19,6 @@
     <!-- Voice capture -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
-    <!-- Claude API parsing -->
-    <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-
     <!-- Android 11+ hides other apps' install status unless declared here;
          without this, checking "is Instagram installed" always says no. -->
     <queries>
@@ -64,6 +60,14 @@
             android:exported="false"
             android:excludeFromRecents="true"
             android:launchMode="singleTask"
+            android:theme="@style/Theme.BacklogNudge.Transparent" />
+
+        <!-- Invisible trampoline for the notification's "Let's go" action - see LeaveAppActivity for why this can't just be a BroadcastReceiver. -->
+        <activity
+            android:name=".nudge.LeaveAppActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
             android:theme="@style/Theme.BacklogNudge.Transparent" />
 
         <!-- Bubble-expanded activity showing the active nudge -->
