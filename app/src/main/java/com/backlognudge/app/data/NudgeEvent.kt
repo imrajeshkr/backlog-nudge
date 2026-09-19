@@ -4,7 +4,9 @@ import androidx.room.Entity
 import androidx.room.PrimaryKey
 
 enum class NudgeResponse {
-    DID_IT, SNOOZED, DISMISSED, REMOVED, PENDING
+    DID_IT, SNOOZED, DISMISSED, REMOVED, PENDING,
+    /** User backed out of the watched app but didn't mark the item done or snoozed - a step short of DID_IT. */
+    LEFT_APP
 }
 
 @Entity(tableName = "nudge_events")

@@ -1,5 +1,6 @@
 package com.backlognudge.app.nudge
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -7,6 +8,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.Snooze
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -46,6 +48,7 @@ class NudgeBubbleActivity : ComponentActivity() {
                     } else {
                         BubbleContent(
                             item = current,
+                            onLeave = { respond(itemId, eventId, NudgeResponse.LEFT_APP, goHome = true) },
                             onDone = { respond(itemId, eventId, NudgeResponse.DID_IT) },
                             onSnooze = { respond(itemId, eventId, NudgeResponse.SNOOZED) },
                             onDismiss = { respond(itemId, eventId, NudgeResponse.DISMISSED) }
@@ -56,7 +59,7 @@ class NudgeBubbleActivity : ComponentActivity() {
         }
     }
 
-    private fun respond(itemId: Long, eventId: Long, response: NudgeResponse) {
+    private fun respond(itemId: Long, eventId: Long, response: NudgeResponse, goHome: Boolean = false) {
         val db = (application as BacklogNudgeApp).database
         lifecycleScope.launch {
             when (response) {
@@ -69,6 +72,9 @@ class NudgeBubbleActivity : ComponentActivity() {
                 db.nudgeDao().getById(eventId)?.let { db.nudgeDao().update(it.copy(response = response)) }
             }
             NudgeNotifier.cancel(this@NudgeBubbleActivity, itemId)
+            if (goHome) {
+                startActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            }
             finish()
         }
     }
@@ -82,6 +88,7 @@ class NudgeBubbleActivity : ComponentActivity() {
 @Composable
 private fun BubbleContent(
     item: BacklogItem,
+    onLeave: () -> Unit,
     onDone: () -> Unit,
     onSnooze: () -> Unit,
     onDismiss: () -> Unit
@@ -102,10 +109,16 @@ private fun BubbleContent(
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Spacer(Modifier.height(24.dp))
-        Button(onClick = onDone, modifier = Modifier.fillMaxWidth()) {
+        Button(onClick = onLeave, modifier = Modifier.fillMaxWidth()) {
+            Icon(Icons.Filled.Logout, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Text("Leave and go do it")
+        }
+        Spacer(Modifier.height(10.dp))
+        OutlinedButton(onClick = onDone, modifier = Modifier.fillMaxWidth()) {
             Icon(Icons.Filled.CheckCircle, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
-            Text("Do it now")
+            Text("Already done")
         }
         Spacer(Modifier.height(10.dp))
         OutlinedButton(onClick = onSnooze, modifier = Modifier.fillMaxWidth()) {

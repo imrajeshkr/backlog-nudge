@@ -19,9 +19,19 @@ class NudgeActionReceiver : BroadcastReceiver() {
         val pendingResult = goAsync()
         val db = (context.applicationContext as BacklogNudgeApp).database
 
+        if (intent.action == ACTION_LEAVE) {
+            // Just back out to the home screen - deliberately does NOT touch the item's
+            // status. Leaving the watched app is a separate decision from having actually
+            // finished the task, which is why this is a distinct action from ACTION_DONE.
+            context.startActivity(
+                Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
+        }
+
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 when (intent.action) {
+                    ACTION_LEAVE -> setEventResponse(context, eventId, NudgeResponse.LEFT_APP)
                     ACTION_DONE -> {
                         db.backlogDao().markDone(itemId)
                         setEventResponse(context, eventId, NudgeResponse.DID_IT)
@@ -51,6 +61,7 @@ class NudgeActionReceiver : BroadcastReceiver() {
     }
 
     companion object {
+        const val ACTION_LEAVE = "com.backlognudge.app.action.NUDGE_LEAVE"
         const val ACTION_DONE = "com.backlognudge.app.action.NUDGE_DONE"
         const val ACTION_SNOOZE = "com.backlognudge.app.action.NUDGE_SNOOZE"
         const val ACTION_DISMISS = "com.backlognudge.app.action.NUDGE_DISMISS"

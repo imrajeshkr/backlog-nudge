@@ -286,6 +286,7 @@ private fun responseLabel(response: NudgeResponse): String = when (response) {
     NudgeResponse.DISMISSED -> "Not today"
     NudgeResponse.REMOVED -> "Removed"
     NudgeResponse.PENDING -> "Pending"
+    NudgeResponse.LEFT_APP -> "Left app"
 }
 
 @Composable
