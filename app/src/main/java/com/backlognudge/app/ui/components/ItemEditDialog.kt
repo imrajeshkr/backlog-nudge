@@ -87,10 +87,13 @@ fun ItemEditDialog(
                     )
                     onSave(result)
                 }
-            ) { Text("Save") }
+            ) { Text("Save", color = MaterialTheme.colorScheme.primary) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            // Backing out isn't "going", so it doesn't get the accent.
+            TextButton(onClick = onDismiss) {
+                Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         }
     )
 }
