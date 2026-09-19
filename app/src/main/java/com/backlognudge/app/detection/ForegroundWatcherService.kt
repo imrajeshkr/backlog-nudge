@@ -97,9 +97,12 @@ class ForegroundWatcherService : LifecycleService() {
         val name = WatchedApps.friendlyName(pkg)
 
         if (elapsed >= thresholdMs) {
-            updateNotification("Nudging you about $name now…")
-            nudgeManager.maybeTriggerNudge(pkg)
-            // Re-arm: next nudge fires after another full threshold of continuous use.
+            val nudged = nudgeManager.maybeTriggerNudge(pkg)
+            updateNotification(
+                if (nudged) "Sent you a nudge about $name"
+                else "Been on $name a while, but your backlog is empty — nothing to nudge you with"
+            )
+            // Re-arm: next check fires after another full threshold of continuous use.
             sessionStartTs = now
         } else {
             updateNotification("Watching $name — nudge in ${remainingMin + 1} min if it keeps going")

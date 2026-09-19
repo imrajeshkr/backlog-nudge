@@ -14,20 +14,33 @@ import android.os.Process
  */
 class UsageTracker(private val context: Context) {
 
+    // Carries the last-known foreground state across calls. Android only emits
+    // an ACTIVITY_RESUMED/MOVE_TO_FOREGROUND event at the moment an app comes
+    // forward - not repeatedly while it stays there - so a stateless query
+    // limited to a short recent window would incorrectly report "unknown" as
+    // soon as that one event ages out of the window, even though the app is
+    // still genuinely in front. Remembering where we left off (and folding
+    // that starting point into the query range) keeps a long-running session
+    // correctly detected instead of silently reverting to idle.
+    private var knownForegroundPackage: String? = null
+    private var knownForegroundTs: Long = 0L
+
     /**
      * Returns the package name currently in the foreground, or null if it
-     * can't be determined (e.g. screen off, or no recent events).
-     * Looks back a short window and takes the most recent foreground/resume event.
+     * can't be determined (e.g. screen off, or no events ever seen).
+     * Looks back a short window (or further, if needed to cover the last
+     * known state) and takes the most recent foreground/resume event.
      */
     fun currentForegroundPackage(lookbackMs: Long = 70_000L): String? {
         val usm = context.getSystemService(Context.USAGE_STATS_SERVICE) as? UsageStatsManager
             ?: return null
         val end = System.currentTimeMillis()
-        val start = end - lookbackMs
+        val recentWindowStart = end - lookbackMs
+        val start = if (knownForegroundTs > 0) minOf(knownForegroundTs, recentWindowStart) else recentWindowStart
         val events: UsageEvents = usm.queryEvents(start, end)
 
-        var lastForegroundPackage: String? = null
-        var lastForegroundTs = 0L
+        var lastForegroundPackage: String? = knownForegroundPackage
+        var lastForegroundTs = knownForegroundTs
         val event = UsageEvents.Event()
 
         while (events.hasNextEvent()) {
@@ -47,6 +60,8 @@ class UsageTracker(private val context: Context) {
                 lastForegroundTs = event.timeStamp
             }
         }
+        knownForegroundPackage = lastForegroundPackage
+        knownForegroundTs = lastForegroundTs
         return lastForegroundPackage
     }
 

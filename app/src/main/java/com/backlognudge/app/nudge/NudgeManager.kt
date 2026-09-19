@@ -20,9 +20,10 @@ class NudgeManager(private val context: Context) {
     private val db by lazy { (context.applicationContext as BacklogNudgeApp).database }
     private val securePrefs by lazy { SecurePrefs(context) }
 
-    suspend fun maybeTriggerNudge(watchedPackage: String) {
+    /** Returns true if a nudge was actually posted - false means the threshold fired but there was nothing pending to nudge about. */
+    suspend fun maybeTriggerNudge(watchedPackage: String): Boolean {
         val candidates = db.backlogDao().eligibleForNudge()
-        if (candidates.isEmpty()) return
+        if (candidates.isEmpty()) return false
 
         val item = pickItem(candidates)
         val copy = generateCopy(item, watchedPackage)
@@ -33,6 +34,7 @@ class NudgeManager(private val context: Context) {
         db.backlogDao().recordNudged(item.id)
 
         NudgeNotifier.postNudge(context, item, eventId, watchedPackage, copy)
+        return true
     }
 
     /** Fewer snoozes, longer since last nudged, and shorter items win - a quick win beats a big ask mid-scroll. */
