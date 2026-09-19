@@ -15,7 +15,6 @@ import androidx.core.graphics.drawable.IconCompat
 import com.backlognudge.app.BacklogNudgeApp
 import com.backlognudge.app.R
 import com.backlognudge.app.data.BacklogItem
-import com.backlognudge.app.detection.WatchedApps
 import com.backlognudge.app.ui.MainActivity
 
 /**
@@ -43,7 +42,6 @@ object NudgeNotifier {
         publishConversationShortcut(context, shortcutId, person)
 
         val contentPendingIntent = bubbleContentIntent(context, item.id, eventId, watchedPackage, notificationId)
-        val appName = WatchedApps.friendlyName(watchedPackage)
 
         val builder = NotificationCompat.Builder(context, BacklogNudgeApp.CHANNEL_NUDGE)
             .setSmallIcon(R.drawable.ic_notification)
@@ -58,7 +56,7 @@ object NudgeNotifier {
             // Capped at 3 quick actions - most launchers only render three on a collapsed
             // heads-up/notification-shade view regardless of how many are added. "Not today"
             // is still reachable one tap deeper, inside the expanded bubble/sheet.
-            .addAction(action(context, "Leave $appName", R.drawable.ic_action_close, NudgeActionReceiver.ACTION_LEAVE, item.id, eventId))
+            .addAction(action(context, "Leave", R.drawable.ic_action_close, NudgeActionReceiver.ACTION_LEAVE, item.id, eventId))
             .addAction(action(context, "Done", R.drawable.ic_action_check, NudgeActionReceiver.ACTION_DONE, item.id, eventId))
             .addAction(action(context, "Snooze 30m", R.drawable.ic_action_snooze, NudgeActionReceiver.ACTION_SNOOZE, item.id, eventId))
 
