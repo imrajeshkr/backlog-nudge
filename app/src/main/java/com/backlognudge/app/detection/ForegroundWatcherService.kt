@@ -66,7 +66,8 @@ class ForegroundWatcherService : LifecycleService() {
         }
 
         val watched = prefs.watchedPackages.first()
-        val thresholdMs = prefs.thresholdMinutes.first() * 60_000L
+        val normalThresholdMs = prefs.thresholdMinutes.first() * 60_000L
+        val dailyLimitMs = prefs.dailyLimitMinutes.first() * 60_000L
         val now = System.currentTimeMillis()
         val fg = usageTracker.currentForegroundPackage()
 
@@ -93,18 +94,29 @@ class ForegroundWatcherService : LifecycleService() {
         }
 
         val elapsed = now - sessionStartTs
-        val remainingMin = ((thresholdMs - elapsed) / 60_000L).coerceAtLeast(0)
         val name = WatchedApps.friendlyName(pkg)
 
-        if (elapsed >= thresholdMs) {
+        // Already burned through today's budget across earlier sessions? Don't make
+        // them wait through a full fresh continuous-session threshold again - nudge
+        // almost as soon as they're back.
+        val totalTodayMs = usageTracker.totalForegroundTimeTodayMs(pkg)
+        val overDailyLimit = totalTodayMs >= dailyLimitMs
+        val effectiveThresholdMs = if (overDailyLimit) AppPrefs.OVER_LIMIT_THRESHOLD_MS else normalThresholdMs
+
+        if (elapsed >= effectiveThresholdMs) {
             val nudged = nudgeManager.maybeTriggerNudge(pkg)
             updateNotification(
                 if (nudged) "Sent you a nudge about $name"
                 else "Been on $name a while, but your backlog is empty — nothing to nudge you with"
             )
-            // Re-arm: next check fires after another full threshold of continuous use.
+            // Re-arm: next check fires after another full threshold of continuous use
+            // (or, still over the daily limit, another quick fast-nudge interval).
             sessionStartTs = now
+        } else if (overDailyLimit) {
+            val remainingSec = ((effectiveThresholdMs - elapsed) / 1000L).coerceAtLeast(0) + 1
+            updateNotification("You're already past today's $name limit — nudging in ${remainingSec}s")
         } else {
+            val remainingMin = ((effectiveThresholdMs - elapsed) / 60_000L).coerceAtLeast(0)
             updateNotification("Watching $name — nudge in ${remainingMin + 1} min if it keeps going")
         }
     }

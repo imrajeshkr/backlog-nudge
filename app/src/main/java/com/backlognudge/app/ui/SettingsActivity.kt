@@ -50,6 +50,7 @@ private fun SettingsScreen(prefs: AppPrefs, securePrefs: SecurePrefs, onBack: ()
 
     val watcherEnabled by prefs.watcherEnabled.collectAsState(initial = false)
     val threshold by prefs.thresholdMinutes.collectAsState(initial = AppPrefs.DEFAULT_THRESHOLD_MINUTES)
+    val dailyLimit by prefs.dailyLimitMinutes.collectAsState(initial = AppPrefs.DEFAULT_DAILY_LIMIT_MINUTES)
     val ttsEnabled by prefs.ttsConfirmEnabled.collectAsState(initial = true)
 
     var apiKeyInput by remember { mutableStateOf(securePrefs.claudeApiKey.orEmpty()) }
@@ -123,6 +124,15 @@ private fun SettingsScreen(prefs: AppPrefs, securePrefs: SecurePrefs, onBack: ()
                 value = threshold.toFloat(),
                 onValueChange = { scope.launch { prefs.setThresholdMinutes(it.toInt()) } },
                 valueRange = 5f..60f,
+                steps = 10
+            )
+
+            Spacer(Modifier.height(16.dp))
+            Text("Once you've spent $dailyLimit min total on it today, re-opening nudges almost instantly", style = MaterialTheme.typography.bodyMedium)
+            Slider(
+                value = dailyLimit.toFloat(),
+                onValueChange = { scope.launch { prefs.setDailyLimitMinutes(it.toInt()) } },
+                valueRange = 15f..180f,
                 steps = 10
             )
 

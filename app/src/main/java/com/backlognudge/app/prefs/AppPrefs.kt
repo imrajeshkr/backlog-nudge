@@ -19,6 +19,7 @@ class AppPrefs(private val context: Context) {
         val ONBOARDING_COMPLETE = booleanPreferencesKey("onboarding_complete")
         val WATCHER_ENABLED = booleanPreferencesKey("watcher_enabled")
         val THRESHOLD_MINUTES = intPreferencesKey("threshold_minutes")
+        val DAILY_LIMIT_MINUTES = intPreferencesKey("daily_limit_minutes")
         val WATCHED_PACKAGES = stringSetPreferencesKey("watched_packages")
         val LAST_HEARTBEAT = longPreferencesKey("last_heartbeat")
         val TTS_CONFIRM = booleanPreferencesKey("tts_confirm_enabled")
@@ -45,6 +46,14 @@ class AppPrefs(private val context: Context) {
         context.dataStore.edit { it[Keys.THRESHOLD_MINUTES] = minutes }
     }
 
+    /** Once today's cumulative time in a watched app crosses this, re-opening it nudges almost immediately (see OVER_LIMIT_THRESHOLD_MS) instead of waiting for the full continuous threshold again. */
+    val dailyLimitMinutes: Flow<Int> =
+        context.dataStore.data.map { it[Keys.DAILY_LIMIT_MINUTES] ?: DEFAULT_DAILY_LIMIT_MINUTES }
+
+    suspend fun setDailyLimitMinutes(minutes: Int) {
+        context.dataStore.edit { it[Keys.DAILY_LIMIT_MINUTES] = minutes }
+    }
+
     val watchedPackages: Flow<Set<String>> =
         context.dataStore.data.map { it[Keys.WATCHED_PACKAGES] ?: WatchedApps.DEFAULT_PACKAGES }
 
@@ -68,6 +77,10 @@ class AppPrefs(private val context: Context) {
 
     companion object {
         const val DEFAULT_THRESHOLD_MINUTES = 15
+        const val DEFAULT_DAILY_LIMIT_MINUTES = 60
+
+        /** Fast re-nudge delay once today's usage is already past the daily limit - deliberately not a full continuous session, since the point is "you're already over budget, don't let it restart quietly." */
+        const val OVER_LIMIT_THRESHOLD_MS = 30_000L
 
         /**
          * The watcher polls every ~5s (see ForegroundWatcherService.POLL_INTERVAL_MS).

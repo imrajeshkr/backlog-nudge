@@ -65,6 +65,29 @@ class UsageTracker(private val context: Context) {
         return lastForegroundPackage
     }
 
+    /**
+     * Total time (ms) the given package has spent in the foreground since local midnight today,
+     * including whatever's happened in the session up to right now. Used to tell "you've been
+     * scrolling for 15 minutes just now" apart from "you've already burned an hour on this app
+     * today across several sessions" - the latter should nudge much faster on the next open.
+     */
+    fun totalForegroundTimeTodayMs(pkg: String): Long {
+        val usm = context.getSystemService(Context.USAGE_STATS_SERVICE) as? UsageStatsManager
+            ?: return 0L
+        val now = System.currentTimeMillis()
+        val startOfDay = java.util.Calendar.getInstance().apply {
+            timeInMillis = now
+            set(java.util.Calendar.HOUR_OF_DAY, 0)
+            set(java.util.Calendar.MINUTE, 0)
+            set(java.util.Calendar.SECOND, 0)
+            set(java.util.Calendar.MILLISECOND, 0)
+        }.timeInMillis
+
+        val stats = usm.queryUsageStats(UsageStatsManager.INTERVAL_DAILY, startOfDay, now)
+            ?: return 0L
+        return stats.filter { it.packageName == pkg }.sumOf { it.totalTimeInForeground }
+    }
+
     /** Whether the app has been granted PACKAGE_USAGE_STATS via Settings. */
     fun hasUsageAccess(): Boolean {
         val appOps = context.getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
