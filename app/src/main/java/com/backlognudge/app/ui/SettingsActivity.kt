@@ -8,18 +8,25 @@ import android.os.PowerManager
 import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.backlognudge.app.detection.ForegroundWatcherService
 import com.backlognudge.app.detection.UsageTracker
-import com.backlognudge.app.detection.WatchedApps
 import com.backlognudge.app.prefs.AppPrefs
 import com.backlognudge.app.ui.theme.BacklogNudgeTheme
+import com.backlognudge.app.ui.theme.BucketStyle
+import com.backlognudge.app.ui.theme.HeadlineSerif
+import com.backlognudge.app.ui.theme.LocalExtraColors
 import kotlinx.coroutines.launch
 
 class SettingsActivity : ComponentActivity() {
@@ -29,7 +36,10 @@ class SettingsActivity : ComponentActivity() {
 
         setContent {
             BacklogNudgeTheme {
-                Surface(modifier = Modifier.fillMaxSize()) {
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background
+                ) {
                     SettingsScreen(prefs, onBack = { finish() })
                 }
             }
@@ -63,27 +73,41 @@ private fun SettingsScreen(prefs: AppPrefs, onBack: () -> Unit) {
     }
 
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            TopAppBar(
-                title = { Text("Settings") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 6.dp, end = 20.dp, top = 18.dp, bottom = 6.dp),
+                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+            ) {
+                IconButton(onClick = onBack) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Back",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
-            )
+                Spacer(Modifier.width(4.dp))
+                Text(
+                    "Settings",
+                    style = HeadlineSerif.copy(fontSize = 28.sp, lineHeight = 32.sp),
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+            }
         }
     ) { padding ->
         Column(
             modifier = Modifier
                 .padding(padding)
-                .padding(20.dp)
+                .padding(horizontal = 20.dp)
                 .fillMaxSize()
+                .verticalScroll(rememberScrollState())
         ) {
-            SectionLabel("Scroll-session watching")
+            SectionLabel("Watching")
             SettingsRow(
-                title = "Watch for long Instagram sessions",
-                subtitle = if (hasUsageAccess) "Usage access granted" else "Usage access needed — tap to grant",
+                title = "Watch Instagram",
+                subtitle = if (hasUsageAccess) null else "Needs permission — tap to grant"
             ) {
                 Switch(
                     checked = watcherEnabled,
@@ -95,59 +119,111 @@ private fun SettingsScreen(prefs: AppPrefs, onBack: () -> Unit) {
                             prefs.setWatcherEnabled(enabled)
                             if (enabled) ForegroundWatcherService.start(context) else ForegroundWatcherService.stop(context)
                         }
-                    }
+                    },
+                    // A toggle isn't "going", so it stays achromatic: an on
+                    // switch reads as ink-on-bone, not as an accent.
+                    colors = quietSwitchColors()
                 )
             }
             if (!hasUsageAccess) {
                 TextButton(onClick = { context.startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)) }) {
-                    Text("Open usage-access settings")
+                    Text("Turn on", color = MaterialTheme.colorScheme.primary)
                 }
             }
 
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(28.dp))
+            SectionLabel("Timing")
             Text(
-                "Watching: ${WatchedApps.friendlyName(WatchedApps.INSTAGRAM)}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                "Nudge after $threshold min of scrolling",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onBackground
             )
-
-            Spacer(Modifier.height(24.dp))
-            SectionLabel("Nudge timing")
-            Text("Nudge after $threshold min of continuous scrolling", style = MaterialTheme.typography.bodyMedium)
-            Slider(
+            QuietSlider(
                 value = threshold.toFloat(),
                 onValueChange = { scope.launch { prefs.setThresholdMinutes(it.toInt()) } },
                 valueRange = 5f..60f,
                 steps = 10
             )
 
-            Spacer(Modifier.height(16.dp))
-            Text("Once you've spent $dailyLimit min total on it today, re-opening nudges almost instantly", style = MaterialTheme.typography.bodyMedium)
-            Slider(
+            Spacer(Modifier.height(18.dp))
+            Text(
+                "After $dailyLimit min today, nudge right away",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+            QuietSlider(
                 value = dailyLimit.toFloat(),
                 onValueChange = { scope.launch { prefs.setDailyLimitMinutes(it.toInt()) } },
                 valueRange = 15f..180f,
                 steps = 10
             )
 
-            Spacer(Modifier.height(24.dp))
-            SectionLabel("Battery")
-            OutlinedButton(onClick = { requestIgnoreBatteryOptimizations(context) }) {
-                Text("Exempt from battery optimization")
+            Spacer(Modifier.height(28.dp))
+            SectionLabel("Reliability")
+            SettingsRow(
+                title = "Keep nudges on time",
+                subtitle = "Stops your phone sleeping the app."
+            ) {
+                OutlinedButton(
+                    onClick = { requestIgnoreBatteryOptimizations(context) },
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, LocalExtraColors.current.hairline),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface)
+                ) {
+                    Text("Allow")
+                }
             }
-            Text(
-                "If nudges stop arriving after a while, your device may be killing the background watcher to save power. Exempting the app keeps it reliable.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
 
-            Spacer(Modifier.height(24.dp))
-            SectionLabel("Voice capture")
-            SettingsRow(title = "Speak confirmation back after capture", subtitle = null) {
-                Switch(checked = ttsEnabled, onCheckedChange = { scope.launch { prefs.setTtsConfirmEnabled(it) } })
+            Spacer(Modifier.height(28.dp))
+            SectionLabel("Voice")
+            SettingsRow(title = "Read it back to me", subtitle = null) {
+                Switch(
+                    checked = ttsEnabled,
+                    onCheckedChange = { scope.launch { prefs.setTtsConfirmEnabled(it) } },
+                    // A toggle isn't "going", so it stays achromatic: an on
+                    // switch reads as ink-on-bone, not as an accent.
+                    colors = quietSwitchColors()
+                )
             }
+            Spacer(Modifier.height(40.dp))
         }
     }
+}
+
+@Composable
+private fun quietSwitchColors() = SwitchDefaults.colors(
+    checkedThumbColor = MaterialTheme.colorScheme.background,
+    checkedTrackColor = MaterialTheme.colorScheme.onSurfaceVariant,
+    checkedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant,
+    uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant,
+    uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant,
+    uncheckedBorderColor = MaterialTheme.colorScheme.outline
+)
+
+/**
+ * The slider's track is chrome, not a "go" action, so the filled portion is a
+ * grey; only the thumb picks up the accent to show where you are.
+ */
+@Composable
+private fun QuietSlider(
+    value: Float,
+    onValueChange: (Float) -> Unit,
+    valueRange: ClosedFloatingPointRange<Float>,
+    steps: Int
+) {
+    Slider(
+        value = value,
+        onValueChange = onValueChange,
+        valueRange = valueRange,
+        steps = steps,
+        colors = SliderDefaults.colors(
+            thumbColor = MaterialTheme.colorScheme.onSurface,
+            activeTrackColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant,
+            activeTickColor = MaterialTheme.colorScheme.surfaceVariant,
+            inactiveTickColor = MaterialTheme.colorScheme.surfaceVariant
+        )
+    )
 }
 
 private fun requestIgnoreBatteryOptimizations(context: android.content.Context) {
@@ -162,20 +238,33 @@ private fun requestIgnoreBatteryOptimizations(context: android.content.Context) 
 
 @Composable
 private fun SectionLabel(text: String) {
-    Text(text, style = MaterialTheme.typography.titleMedium)
-    Spacer(Modifier.height(8.dp))
+    Text(
+        text.uppercase(),
+        style = BucketStyle,
+        color = LocalExtraColors.current.faint
+    )
+    Spacer(Modifier.height(12.dp))
 }
 
 @Composable
 private fun SettingsRow(title: String, subtitle: String?, trailing: @Composable () -> Unit) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
         verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
     ) {
-        Column(Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.bodyLarge)
+        Column(Modifier.weight(1f).padding(end = 12.dp)) {
+            Text(
+                title,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onBackground
+            )
             if (subtitle != null) {
-                Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
         trailing()
