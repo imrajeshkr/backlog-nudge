@@ -14,14 +14,11 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.backlognudge.app.detection.ForegroundWatcherService
 import com.backlognudge.app.detection.UsageTracker
 import com.backlognudge.app.detection.WatchedApps
 import com.backlognudge.app.prefs.AppPrefs
-import com.backlognudge.app.prefs.SecurePrefs
 import com.backlognudge.app.ui.theme.BacklogNudgeTheme
 import kotlinx.coroutines.launch
 
@@ -29,12 +26,11 @@ class SettingsActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val prefs = AppPrefs(this)
-        val securePrefs = SecurePrefs(this)
 
         setContent {
             BacklogNudgeTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
-                    SettingsScreen(prefs, securePrefs, onBack = { finish() })
+                    SettingsScreen(prefs, onBack = { finish() })
                 }
             }
         }
@@ -43,7 +39,7 @@ class SettingsActivity : ComponentActivity() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun SettingsScreen(prefs: AppPrefs, securePrefs: SecurePrefs, onBack: () -> Unit) {
+private fun SettingsScreen(prefs: AppPrefs, onBack: () -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope = rememberCoroutineScope()
     val usageTracker = remember { UsageTracker(context) }
@@ -53,8 +49,6 @@ private fun SettingsScreen(prefs: AppPrefs, securePrefs: SecurePrefs, onBack: ()
     val dailyLimit by prefs.dailyLimitMinutes.collectAsState(initial = AppPrefs.DEFAULT_DAILY_LIMIT_MINUTES)
     val ttsEnabled by prefs.ttsConfirmEnabled.collectAsState(initial = true)
 
-    var apiKeyInput by remember { mutableStateOf(securePrefs.claudeApiKey.orEmpty()) }
-    var showKey by remember { mutableStateOf(false) }
     var hasUsageAccess by remember { mutableStateOf(usageTracker.hasUsageAccess()) }
 
     val lifecycleOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
@@ -151,30 +145,6 @@ private fun SettingsScreen(prefs: AppPrefs, securePrefs: SecurePrefs, onBack: ()
             SectionLabel("Voice capture")
             SettingsRow(title = "Speak confirmation back after capture", subtitle = null) {
                 Switch(checked = ttsEnabled, onCheckedChange = { scope.launch { prefs.setTtsConfirmEnabled(it) } })
-            }
-
-            Spacer(Modifier.height(24.dp))
-            SectionLabel("Claude API key")
-            Text(
-                "Used to structure your spoken backlog items and to write nudge copy. Stored encrypted on-device, never logged.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(Modifier.height(8.dp))
-            OutlinedTextField(
-                value = apiKeyInput,
-                onValueChange = { apiKeyInput = it },
-                label = { Text("API key") },
-                singleLine = true,
-                visualTransformation = if (showKey) VisualTransformation.None else PasswordVisualTransformation(),
-                modifier = Modifier.fillMaxWidth()
-            )
-            Row {
-                TextButton(onClick = { showKey = !showKey }) { Text(if (showKey) "Hide" else "Show") }
-                Spacer(Modifier.weight(1f))
-                Button(onClick = { securePrefs.claudeApiKey = apiKeyInput.trim().ifBlank { null } }) {
-                    Text("Save key")
-                }
             }
         }
     }

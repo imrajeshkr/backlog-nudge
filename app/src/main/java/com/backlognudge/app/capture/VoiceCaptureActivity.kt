@@ -36,7 +36,6 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.lifecycleScope
 import com.backlognudge.app.BacklogNudgeApp
 import com.backlognudge.app.prefs.AppPrefs
-import com.backlognudge.app.prefs.SecurePrefs
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -148,29 +147,14 @@ class VoiceCaptureActivity : ComponentActivity() {
 
     private fun handleTranscript(transcript: String) {
         state.value = CaptureState.PROCESSING
-        message.value = "Structuring that…"
+        message.value = "Saving that…"
 
         lifecycleScope.launch {
-            val securePrefs = SecurePrefs(applicationContext)
-            val parser = TranscriptParser { securePrefs.claudeApiKey }
-            val result = parser.parse(transcript)
+            val item = TranscriptParser().parse(transcript)
             val db = (application as BacklogNudgeApp).database
+            db.backlogDao().insert(item)
 
-            val confirmation: String = when (result) {
-                is ParseResult.Parsed -> {
-                    db.backlogDao().insertAll(result.items)
-                    if (result.items.size == 1) {
-                        "Got it - added “${result.items.first().title}”."
-                    } else {
-                        "Added ${result.items.size} items to your backlog."
-                    }
-                }
-                is ParseResult.Fallback -> {
-                    db.backlogDao().insert(result.item)
-                    result.reason
-                }
-            }
-
+            val confirmation = "Got it - added “${item.title}”."
             state.value = CaptureState.DONE
             message.value = confirmation
 
