@@ -57,7 +57,8 @@ object NudgeNotifier {
             .addAction(action(context, "Snooze 30m", R.drawable.ic_action_snooze, NudgeActionReceiver.ACTION_SNOOZE, item.id, eventId))
             .addAction(action(context, "Not today", R.drawable.ic_action_close, NudgeActionReceiver.ACTION_DISMISS, item.id, eventId))
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && bubblesAllowed(context, nm)) {
+        val bubblesReady = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && bubblesAllowed(context, nm)
+        if (bubblesReady) {
             runCatching {
                 val bubbleIntent = PendingIntent.getActivity(
                     context, notificationId,
@@ -70,10 +71,23 @@ object NudgeNotifier {
                 val bubbleIcon = Icon.createWithResource(context, R.drawable.ic_notification)
                 val metadata = NotificationCompat.BubbleMetadata.Builder(bubbleIntent, IconCompat.createFromIcon(context, bubbleIcon)!!)
                     .setDesiredHeight(600)
-                    .setAutoExpandBubble(false)
-                    .setSuppressNotification(false)
+                    // Pop straight open as a floating window over whatever app is in front
+                    // (Instagram keeps running underneath - this doesn't close it) instead
+                    // of waiting for the user to notice and tap a small chat-head icon.
+                    .setAutoExpandBubble(true)
+                    .setSuppressNotification(true)
                     .build()
                 builder.setBubbleMetadata(metadata)
+            }
+        } else {
+            // No bubble support/permission on this device - the next best thing to
+            // "pop open automatically" is a full-screen-intent notification, which
+            // brings the nudge screen to the front immediately without a tap. This
+            // does bring our app forward (Instagram goes to the background, not
+            // closed - it's still there on the back stack), which is the accepted
+            // fallback when an overlay-on-top-of-Instagram isn't available.
+            runCatching {
+                builder.setFullScreenIntent(contentPendingIntent, true)
             }
         }
 

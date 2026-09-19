@@ -12,6 +12,9 @@
 
     <!-- Notifications / Bubbles -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Lets the nudge pop straight to the front (over whatever app is open) when
+         bubbles aren't available/enabled on this device, instead of waiting for a tap. -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
 
     <!-- Voice capture -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
