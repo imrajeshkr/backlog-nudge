@@ -104,7 +104,7 @@ class ForegroundWatcherService : LifecycleService() {
         val effectiveThresholdMs = if (overDailyLimit) AppPrefs.OVER_LIMIT_THRESHOLD_MS else normalThresholdMs
 
         if (elapsed >= effectiveThresholdMs) {
-            val nudged = nudgeManager.maybeTriggerNudge(pkg)
+            val nudged = nudgeManager.maybeTriggerNudge(pkg, elapsed)
             updateNotification(
                 if (nudged) "Sent you a nudge about $name"
                 else "Been on $name a while, but your backlog is empty — nothing to nudge you with"

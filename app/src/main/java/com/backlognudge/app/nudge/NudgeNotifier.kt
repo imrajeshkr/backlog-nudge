@@ -28,7 +28,14 @@ import com.backlognudge.app.ui.MainActivity
  */
 object NudgeNotifier {
 
-    fun postNudge(context: Context, item: BacklogItem, eventId: Long, watchedPackage: String, nudgeCopy: String) {
+    fun postNudge(
+        context: Context,
+        item: BacklogItem,
+        eventId: Long,
+        watchedPackage: String,
+        nudgeCopy: String,
+        sessionMinutes: Int
+    ) {
         val nm = context.getSystemService(NotificationManager::class.java)
         val notificationId = NOTIFICATION_ID_BASE + (item.id % 1000).toInt()
 
@@ -41,7 +48,7 @@ object NudgeNotifier {
 
         publishConversationShortcut(context, shortcutId, person)
 
-        val contentPendingIntent = bubbleContentIntent(context, item.id, eventId, watchedPackage, notificationId)
+        val contentPendingIntent = bubbleContentIntent(context, item.id, eventId, watchedPackage, sessionMinutes, notificationId)
 
         val builder = NotificationCompat.Builder(context, BacklogNudgeApp.CHANNEL_NUDGE)
             .setSmallIcon(R.drawable.ic_notification)
@@ -68,6 +75,8 @@ object NudgeNotifier {
                     Intent(context, NudgeBubbleActivity::class.java).apply {
                         putExtra(NudgeBubbleActivity.EXTRA_ITEM_ID, item.id)
                         putExtra(NudgeBubbleActivity.EXTRA_EVENT_ID, eventId)
+                        putExtra(NudgeBubbleActivity.EXTRA_WATCHED_PACKAGE, watchedPackage)
+                        putExtra(NudgeBubbleActivity.EXTRA_SESSION_MINUTES, sessionMinutes)
                     },
                     PendingIntent.FLAG_MUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
                 )
@@ -129,12 +138,15 @@ object NudgeNotifier {
         itemId: Long,
         eventId: Long,
         watchedPackage: String,
+        sessionMinutes: Int,
         notificationId: Int
     ): PendingIntent = PendingIntent.getActivity(
         context, notificationId,
         Intent(context, NudgeBubbleActivity::class.java).apply {
             putExtra(NudgeBubbleActivity.EXTRA_ITEM_ID, itemId)
             putExtra(NudgeBubbleActivity.EXTRA_EVENT_ID, eventId)
+            putExtra(NudgeBubbleActivity.EXTRA_WATCHED_PACKAGE, watchedPackage)
+            putExtra(NudgeBubbleActivity.EXTRA_SESSION_MINUTES, sessionMinutes)
         },
         PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
     )
