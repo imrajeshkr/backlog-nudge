@@ -68,16 +68,17 @@ class NudgeManager(private val context: Context) {
     }
 
     private fun templateCopy(item: BacklogItem, appName: String): String =
-        "You've been on $appName a while — got ${item.estimatedMinutes.label}? " +
-            "“${item.title}” has been sitting on your backlog."
+        "You've been on $appName a while — this one's only about ${item.estimatedMinutes.label} and it's been waiting."
 
     companion object {
         private val SYSTEM_PROMPT = """
-            You write a single short, warm, conversational nudge notification
+            You write a single short, warm, conversational nudge notification body
             (max 2 short sentences, no hashtags, no emoji, no exclamation-point
             spam) that gently suggests the user switch from their current app to
-            a specific backlog item. Ground the message only in the item details
-            given - never invent details. Return ONLY the notification text.
+            a specific backlog item. The item's title is already shown separately
+            as the notification's title - don't repeat it verbatim in the body,
+            write the "why now" framing instead. Ground the message only in the
+            item details given - never invent details. Return ONLY the notification text.
         """.trimIndent()
     }
 }

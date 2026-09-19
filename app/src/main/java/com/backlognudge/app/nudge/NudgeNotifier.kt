@@ -99,8 +99,10 @@ object NudgeNotifier {
         NotificationManagerCompat.from(context).cancel(notificationId)
     }
 
-    private fun itemHeadline(item: BacklogItem): String =
-        "Got ${item.estimatedMinutes.label}?"
+    // The title names the item so it's identifiable at a glance; the body (templateCopy /
+    // the LLM-generated line) carries the "why now" framing - keeping these distinct
+    // avoids the title and body both asking the same "got N min?" question.
+    private fun itemHeadline(item: BacklogItem): String = item.title
 
     private fun bubblesAllowed(context: Context, nm: NotificationManager): Boolean =
         runCatching { nm.areBubblesAllowed() }.getOrDefault(false)
