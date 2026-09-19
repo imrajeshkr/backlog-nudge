@@ -55,6 +55,7 @@ class NudgeManager(private val context: Context) {
 
     private fun templateCopy(item: BacklogItem, sessionMinutes: Int): String {
         val scrolled = if (sessionMinutes == 1) "1 minute" else "$sessionMinutes minutes"
-        return "You've been scrolling $scrolled. This one takes ${item.estimatedMinutes.minutes}."
+        // The label, not the raw number: "120" reads like a bug next to "minutes".
+        return "You've been scrolling $scrolled. This one takes ${item.estimatedMinutes.label}."
     }
 }

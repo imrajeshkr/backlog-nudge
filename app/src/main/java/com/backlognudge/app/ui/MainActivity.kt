@@ -233,6 +233,16 @@ fun MainScreen(prefs: AppPrefs) {
                             )
                         }
                     }
+                    // Typing stays reachable once the list is no longer empty -
+                    // otherwise the only way in is voice.
+                    item(key = "type_instead") {
+                        TextButton(
+                            onClick = { showAddDialog = true },
+                            modifier = Modifier.padding(top = 8.dp)
+                        ) {
+                            Text("Type one instead", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
                 }
             }
         }
@@ -255,6 +265,10 @@ fun MainScreen(prefs: AppPrefs) {
             onDismiss = { editingItem = null },
             onSave = { updated ->
                 scope.launch { db.backlogDao().update(updated) }
+                editingItem = null
+            },
+            onDelete = {
+                scope.launch { db.backlogDao().delete(item.id) }
                 editingItem = null
             }
         )

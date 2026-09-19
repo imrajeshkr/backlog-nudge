@@ -95,7 +95,7 @@ class OnboardingActivity : ComponentActivity() {
             add(
                 OnboardStep(
                     title = "Add your first one",
-                    body = "Hold the button and say what you've been putting off.",
+                    body = "Tap the button and say what you've been putting off.",
                     actionLabel = "Speak it"
                 )
             )

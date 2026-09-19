@@ -17,7 +17,10 @@ import com.backlognudge.app.data.TimeEstimate
 fun ItemEditDialog(
     initial: BacklogItem?,
     onDismiss: () -> Unit,
-    onSave: (BacklogItem) -> Unit
+    onSave: (BacklogItem) -> Unit,
+    // Only offered when editing an existing item. Deleting lives here rather than
+    // as a per-row button: a trash can beside every row invites misses.
+    onDelete: (() -> Unit)? = null
 ) {
     var title by remember { mutableStateOf(initial?.title.orEmpty()) }
     var minutes by remember { mutableStateOf(initial?.estimatedMinutes ?: TimeEstimate.MIN_15) }
@@ -90,9 +93,16 @@ fun ItemEditDialog(
             ) { Text("Save", color = MaterialTheme.colorScheme.primary) }
         },
         dismissButton = {
-            // Backing out isn't "going", so it doesn't get the accent.
-            TextButton(onClick = onDismiss) {
-                Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                if (onDelete != null) {
+                    TextButton(onClick = onDelete) {
+                        Text("Delete", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+                // Backing out isn't "going", so it doesn't get the accent.
+                TextButton(onClick = onDismiss) {
+                    Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
         }
     )
