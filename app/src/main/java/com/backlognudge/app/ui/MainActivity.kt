@@ -155,7 +155,7 @@ fun MainScreen(prefs: AppPrefs) {
             }
             AnimatedVisibility(visible = noWatchedAppInstalled) {
                 StatusBanner(
-                    text = "None of the apps you're watching (${WatchedApps.friendlyName(WatchedApps.INSTAGRAM)}) are installed on this device, so watching won't trigger any nudges.",
+                    text = "${WatchedApps.friendlyName(WatchedApps.INSTAGRAM)} isn't installed here, so this device won't get nudges.",
                     actionLabel = "Dismiss",
                     onAction = {}
                 )
