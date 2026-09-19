@@ -5,30 +5,43 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.outlined.CheckCircle
-import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.lifecycleScope
 import com.backlognudge.app.BacklogNudgeApp
-import com.backlognudge.app.R
 import com.backlognudge.app.data.BacklogItem
-import com.backlognudge.app.data.EnergyLevel
-import com.backlognudge.app.data.ItemCategory
 import com.backlognudge.app.data.ItemStatus
 import com.backlognudge.app.data.NudgeEvent
 import com.backlognudge.app.data.NudgeResponse
@@ -38,6 +51,12 @@ import com.backlognudge.app.detection.WatchedApps
 import com.backlognudge.app.prefs.AppPrefs
 import com.backlognudge.app.ui.components.ItemEditDialog
 import com.backlognudge.app.ui.theme.BacklogNudgeTheme
+import com.backlognudge.app.ui.theme.BucketStyle
+import com.backlognudge.app.ui.theme.HeadlineSerif
+import com.backlognudge.app.ui.theme.LocalExtraColors
+import com.backlognudge.app.ui.theme.MetaStyle
+import com.backlognudge.app.ui.theme.TitleSerif
+import com.backlognudge.app.ui.theme.WordmarkSerif
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -46,7 +65,6 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val db = (application as BacklogNudgeApp).database
         val prefs = AppPrefs(this)
 
         lifecycleScope.launch {
@@ -60,7 +78,10 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             BacklogNudgeTheme {
-                Surface(modifier = Modifier.fillMaxSize()) {
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background
+                ) {
                     MainScreen(prefs = prefs)
                 }
             }
@@ -68,7 +89,16 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
+/**
+ * Time buckets, not recency. Mid-scroll the question is always "what fits in
+ * this gap" — never "what's oldest".
+ */
+private enum class TimeBucket(val header: String, val estimates: Set<TimeEstimate>) {
+    QUICK("Got five minutes", setOf(TimeEstimate.MIN_5)),
+    HALF_HOUR("Got half an hour", setOf(TimeEstimate.MIN_15, TimeEstimate.MIN_30)),
+    SITTING("Needs a real sitting", setOf(TimeEstimate.MIN_60, TimeEstimate.MIN_120))
+}
+
 @Composable
 fun MainScreen(prefs: AppPrefs) {
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -83,7 +113,6 @@ fun MainScreen(prefs: AppPrefs) {
 
     val usageTracker = remember { UsageTracker(context) }
     val hasUsageAccess = remember { mutableStateOf(usageTracker.hasUsageAccess()) }
-    // Re-check whenever the screen resumes (e.g. coming back from Settings).
     val lifecycleOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
@@ -95,9 +124,8 @@ fun MainScreen(prefs: AppPrefs) {
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    // Ticks so the stale-heartbeat check below re-evaluates against "now" even
-    // though nothing in the datastore itself is changing - otherwise a dead
-    // background service would stay silently unreported.
+    // Ticks so the stale-heartbeat check (and item ages) re-evaluate against
+    // "now" even though nothing in the datastore itself is changing.
     var now by remember { mutableStateOf(System.currentTimeMillis()) }
     LaunchedEffect(Unit) {
         while (true) {
@@ -116,67 +144,59 @@ fun MainScreen(prefs: AppPrefs) {
     val launchVoiceCapture = {
         context.startActivity(Intent(context, com.backlognudge.app.capture.VoiceCaptureActivity::class.java))
     }
+    val openSettings = {
+        context.startActivity(Intent(context, SettingsActivity::class.java))
+    }
 
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.app_name), fontWeight = FontWeight.SemiBold) },
-                actions = {
-                    IconButton(onClick = { showNudgeHistory = !showNudgeHistory }) {
-                        Icon(Icons.Filled.History, contentDescription = "Nudge history")
-                    }
-                    IconButton(onClick = {
-                        context.startActivity(Intent(context, SettingsActivity::class.java))
-                    }) {
-                        Icon(Icons.Filled.Settings, contentDescription = "Settings")
-                    }
-                }
+            Wordmark(
+                onHistory = { showNudgeHistory = !showNudgeHistory },
+                onSettings = openSettings
             )
         },
         floatingActionButton = {
-            Column(horizontalAlignment = Alignment.End) {
-                SmallFloatingActionButton(onClick = launchVoiceCapture) {
-                    Icon(Icons.Filled.Mic, contentDescription = "Speak a backlog item")
-                }
-                Spacer(Modifier.height(12.dp))
-                FloatingActionButton(onClick = { showAddDialog = true }) {
-                    Icon(Icons.Filled.Add, contentDescription = "Add item")
-                }
+            // One FAB: the mic. Typing stays reachable from the empty state and
+            // by tapping a row to edit it.
+            FloatingActionButton(
+                onClick = launchVoiceCapture,
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary
+            ) {
+                Icon(Icons.Filled.Mic, contentDescription = "Speak a backlog item")
             }
         }
     ) { padding ->
         Column(modifier = Modifier.padding(padding).fillMaxSize()) {
 
-            AnimatedVisibility(visible = watcherEnabled && !hasUsageAccess.value) {
-                StatusBanner(
-                    text = "Usage-access permission was turned off, so Backlog Nudge can't watch for scroll sessions anymore.",
-                    actionLabel = "Fix in Settings"
-                ) {
-                    context.startActivity(Intent(context, SettingsActivity::class.java))
-                }
-            }
             AnimatedVisibility(visible = watcherEnabled && hasUsageAccess.value && watcherLooksDead) {
                 StatusBanner(
-                    text = "The background watcher seems to have stopped — likely your phone's battery saver killed it. Exempt Backlog Nudge in Settings to keep nudges reliable.",
-                    actionLabel = "Fix in Settings"
-                ) {
-                    context.startActivity(Intent(context, SettingsActivity::class.java))
-                }
+                    text = "Nudges paused — your phone put us to sleep.",
+                    actionLabel = "Fix",
+                    onAction = openSettings
+                )
+            }
+            AnimatedVisibility(visible = watcherEnabled && !hasUsageAccess.value) {
+                StatusBanner(
+                    text = "Nudges are off — permission was turned off.",
+                    actionLabel = "Turn on",
+                    onAction = openSettings
+                )
             }
             AnimatedVisibility(visible = noWatchedAppInstalled && !notInstalledDismissed) {
                 StatusBanner(
-                    text = "${WatchedApps.friendlyName(WatchedApps.INSTAGRAM)} isn't installed here, so this device won't get nudges.",
+                    text = "${WatchedApps.friendlyName(WatchedApps.INSTAGRAM)} isn't installed.",
                     actionLabel = "Dismiss",
                     onAction = { notInstalledDismissed = true }
                 )
             }
             AnimatedVisibility(visible = !watcherEnabled) {
                 StatusBanner(
-                    text = "Scroll-session watching is off — you'll only get nudges you trigger yourself.",
-                    actionLabel = "Turn on"
-                ) {
-                    context.startActivity(Intent(context, SettingsActivity::class.java))
-                }
+                    text = "Watching is off.",
+                    actionLabel = "Turn on",
+                    onAction = openSettings
+                )
             }
             AnimatedVisibility(visible = showNudgeHistory) {
                 NudgeHistorySection(recentNudges = recentNudges, items = items)
@@ -185,19 +205,34 @@ fun MainScreen(prefs: AppPrefs) {
             val openItems = items.filter { it.status == ItemStatus.OPEN }
 
             if (openItems.isEmpty()) {
-                EmptyState(onSpeak = launchVoiceCapture, onAddManually = { showAddDialog = true })
+                EmptyState(onType = { showAddDialog = true })
             } else {
-                LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    items(openItems, key = { it.id }) { item ->
-                        BacklogItemRow(
-                            item = item,
-                            modifier = Modifier.animateItemPlacement(),
-                            onClick = { editingItem = item },
-                            onDone = { scope.launch { db.backlogDao().markDone(item.id) } },
-                            onDelete = { scope.launch { db.backlogDao().delete(item.id) } }
-                        )
+                LazyColumn(
+                    contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 96.dp)
+                ) {
+                    TimeBucket.entries.forEach { bucket ->
+                        val bucketItems = openItems.filter { it.estimatedMinutes in bucket.estimates }
+                        // A bucket with nothing in it doesn't exist.
+                        if (bucketItems.isEmpty()) return@forEach
+
+                        item(key = "header_${bucket.name}") {
+                            BucketHeader(bucket.header, modifier = Modifier.animateItem())
+                        }
+                        items(bucketItems, key = { it.id }) { item ->
+                            BacklogItemRow(
+                                item = item,
+                                now = now,
+                                modifier = Modifier.animateItem(),
+                                onClick = { editingItem = item },
+                                onDone = { scope.launch { db.backlogDao().markDone(item.id) } },
+                                onSnooze = {
+                                    scope.launch {
+                                        db.backlogDao().snooze(item.id, System.currentTimeMillis() + 30 * 60 * 1000L)
+                                    }
+                                }
+                            )
+                        }
                     }
-                    item { Spacer(Modifier.height(72.dp)) }
                 }
             }
         }
@@ -226,20 +261,219 @@ fun MainScreen(prefs: AppPrefs) {
     }
 }
 
+/** Plain background, no filled colour bar: "Back" + an italic green "log". */
+@Composable
+private fun Wordmark(onHistory: () -> Unit, onSettings: () -> Unit) {
+    val go = MaterialTheme.colorScheme.primary
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 20.dp, end = 14.dp, top = 22.dp, bottom = 14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = buildAnnotatedString {
+                append("Back")
+                withStyle(SpanStyle(fontStyle = FontStyle.Italic, color = go)) { append("log") }
+            },
+            style = WordmarkSerif,
+            color = MaterialTheme.colorScheme.onBackground,
+            modifier = Modifier.weight(1f)
+        )
+        CircleIconButton(onClick = onHistory) {
+            Icon(Icons.Filled.History, contentDescription = "Nudge history", modifier = Modifier.size(18.dp))
+        }
+        Spacer(Modifier.width(8.dp))
+        CircleIconButton(onClick = onSettings) {
+            Icon(Icons.Filled.Settings, contentDescription = "Settings", modifier = Modifier.size(18.dp))
+        }
+    }
+}
+
+@Composable
+private fun CircleIconButton(onClick: () -> Unit, content: @Composable () -> Unit) {
+    val extras = LocalExtraColors.current
+    Box(
+        modifier = Modifier
+            .size(38.dp)
+            .border(1.dp, extras.hairline, CircleShape)
+            .clip(CircleShape)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurfaceVariant) {
+            content()
+        }
+    }
+}
+
+@Composable
+private fun BucketHeader(text: String, modifier: Modifier = Modifier) {
+    Text(
+        text.uppercase(),
+        style = BucketStyle,
+        // Section labels are chrome, so they're the faint grey — never green.
+        color = LocalExtraColors.current.faint,
+        modifier = modifier.padding(top = 26.dp, bottom = 10.dp)
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun BacklogItemRow(
+    item: BacklogItem,
+    now: Long,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+    onDone: () -> Unit,
+    onSnooze: () -> Unit
+) {
+    val extras = LocalExtraColors.current
+    // Tapping the tick plays the completion beat locally before the row leaves.
+    var completing by remember(item.id) { mutableStateOf(false) }
+    LaunchedEffect(completing) {
+        if (completing) {
+            delay(380)
+            onDone()
+        }
+    }
+
+    val dismissState = rememberSwipeToDismissBoxState(
+        confirmValueChange = { value ->
+            when (value) {
+                SwipeToDismissBoxValue.StartToEnd -> { completing = true; false }
+                // Snooze isn't a "go" action, so it also isn't a removal — the
+                // row snaps back and simply won't be nudge-eligible for 30 min.
+                SwipeToDismissBoxValue.EndToStart -> { onSnooze(); false }
+                SwipeToDismissBoxValue.Settled -> false
+            }
+        }
+    )
+
+    SwipeToDismissBox(
+        state = dismissState,
+        modifier = modifier,
+        backgroundContent = {
+            val goingRight = dismissState.dismissDirection == SwipeToDismissBoxValue.StartToEnd
+            val bg = if (goingRight) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
+            val fg = if (goingRight) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(vertical = 3.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(bg)
+                    .padding(horizontal = 20.dp),
+                contentAlignment = if (goingRight) Alignment.CenterStart else Alignment.CenterEnd
+            ) {
+                Text(if (goingRight) "DONE" else "SNOOZE 30M", style = MetaStyle, color = fg)
+            }
+        }
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(MaterialTheme.colorScheme.background)
+                .clickable(onClick = onClick)
+                .padding(vertical = 13.dp),
+            verticalAlignment = Alignment.Top
+        ) {
+            CompletionTick(completing = completing, onTap = { completing = true })
+            Spacer(Modifier.width(14.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                // The user's own words, in the user's voice.
+                Text(
+                    item.title,
+                    style = TitleSerif,
+                    color = if (completing) extras.faint else MaterialTheme.colorScheme.onBackground,
+                    textDecoration = if (completing) TextDecoration.LineThrough else null
+                )
+                Spacer(Modifier.height(5.dp))
+                Text(
+                    metaLine(item, now),
+                    style = MetaStyle,
+                    color = extras.faint
+                )
+            }
+        }
+    }
+}
+
+/** The completion tick — the second and last thing green is spent on. */
+@Composable
+private fun CompletionTick(completing: Boolean, onTap: () -> Unit) {
+    val extras = LocalExtraColors.current
+    val go = MaterialTheme.colorScheme.primary
+    val fill by animateColorAsState(
+        targetValue = if (completing) go else Color.Transparent,
+        animationSpec = tween(180),
+        label = "tick-fill"
+    )
+    val ring by animateColorAsState(
+        targetValue = if (completing) go else extras.faint,
+        animationSpec = tween(180),
+        label = "tick-ring"
+    )
+    val scale by animateFloatAsState(
+        targetValue = if (completing) 1.18f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+        label = "tick-scale"
+    )
+    Box(
+        modifier = Modifier
+            .padding(top = 3.dp)
+            .size(24.dp)
+            .scale(scale)
+            .clip(CircleShape)
+            .background(fill)
+            .border(1.5.dp, ring, CircleShape)
+            .clickable(onClick = onTap),
+        contentAlignment = Alignment.Center
+    ) {
+        if (completing) {
+            Icon(
+                Icons.Filled.Check,
+                contentDescription = "Done",
+                tint = MaterialTheme.colorScheme.onPrimary,
+                modifier = Modifier.size(15.dp)
+            )
+        }
+    }
+}
+
+/** One meta line only, e.g. "15 MIN · 3 DAYS OLD". */
+private fun metaLine(item: BacklogItem, now: Long): String {
+    val days = ((now - item.createdAt) / 86_400_000L).toInt()
+    val age = when {
+        days <= 0 -> "TODAY"
+        days == 1 -> "1 DAY OLD"
+        else -> "$days DAYS OLD"
+    }
+    return "${item.estimatedMinutes.label.uppercase()} · $age"
+}
+
 @Composable
 private fun StatusBanner(text: String, actionLabel: String, onAction: () -> Unit) {
     Surface(
-        color = MaterialTheme.colorScheme.errorContainer,
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp)
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 6.dp)
     ) {
         Row(
-            modifier = Modifier.padding(12.dp),
+            modifier = Modifier.padding(start = 14.dp, end = 6.dp, top = 4.dp, bottom = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(Icons.Filled.WarningAmber, contentDescription = null, tint = MaterialTheme.colorScheme.onErrorContainer)
-            Spacer(Modifier.width(10.dp))
-            Text(text, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onErrorContainer)
-            TextButton(onClick = onAction) { Text(actionLabel) }
+            // No red, no warning icon: a permanent alarm just teaches people to
+            // ignore alarms. Plain surface, and the way out is the only accent.
+            Text(
+                text,
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            TextButton(onClick = onAction) {
+                Text(actionLabel, color = MaterialTheme.colorScheme.primary)
+            }
         }
     }
 }
@@ -248,15 +482,19 @@ private fun StatusBanner(text: String, actionLabel: String, onAction: () -> Unit
 private fun NudgeHistorySection(recentNudges: List<NudgeEvent>, items: List<BacklogItem>) {
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
-        shape = MaterialTheme.shapes.medium
+        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 6.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text("Recent nudges", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-            Spacer(Modifier.height(8.dp))
+            Text(
+                "RECENT NUDGES",
+                style = BucketStyle,
+                color = LocalExtraColors.current.faint
+            )
+            Spacer(Modifier.height(10.dp))
             if (recentNudges.isEmpty()) {
                 Text(
-                    "No nudges yet — once you've got backlog items and spend a while in a watched app, they'll show up here.",
+                    "Nothing yet.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -264,14 +502,19 @@ private fun NudgeHistorySection(recentNudges: List<NudgeEvent>, items: List<Back
                 recentNudges.take(8).forEach { event ->
                     val title = items.firstOrNull { it.id == event.itemId }?.title ?: "(deleted item)"
                     Row(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(title, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                        Text(
+                            title,
+                            style = TitleSerif.copy(fontSize = 16.sp),
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.weight(1f)
+                        )
                         Text(
                             responseLabel(event.response),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            style = MetaStyle,
+                            color = LocalExtraColors.current.faint
                         )
                     }
                 }
@@ -281,107 +524,39 @@ private fun NudgeHistorySection(recentNudges: List<NudgeEvent>, items: List<Back
 }
 
 private fun responseLabel(response: NudgeResponse): String = when (response) {
-    NudgeResponse.DID_IT -> "Done"
-    NudgeResponse.SNOOZED -> "Snoozed"
-    NudgeResponse.DISMISSED -> "Not today"
-    NudgeResponse.REMOVED -> "Removed"
-    NudgeResponse.PENDING -> "Pending"
-    NudgeResponse.LEFT_APP -> "Left app"
+    NudgeResponse.DID_IT -> "DONE"
+    NudgeResponse.SNOOZED -> "SNOOZED"
+    NudgeResponse.DISMISSED -> "NOT TODAY"
+    NudgeResponse.REMOVED -> "REMOVED"
+    NudgeResponse.PENDING -> "PENDING"
+    NudgeResponse.LEFT_APP -> "LEFT APP"
 }
 
 @Composable
-private fun EmptyState(onSpeak: () -> Unit, onAddManually: () -> Unit) {
+private fun EmptyState(onType: () -> Unit) {
     Column(
-        modifier = Modifier.fillMaxSize().padding(32.dp),
+        modifier = Modifier.fillMaxSize().padding(horizontal = 32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Icon(Icons.Filled.Mic, contentDescription = null, modifier = Modifier.size(56.dp), tint = MaterialTheme.colorScheme.primary)
-        Spacer(Modifier.height(16.dp))
-        Text("Your backlog is empty", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-        Spacer(Modifier.height(8.dp))
         Text(
-            "Tap below and say what's on your mind — it lands here automatically. (Tip: the mic icon also lives as a Quick Settings tile, so you can speak an item from anywhere without opening the app.)",
-            style = MaterialTheme.typography.bodyMedium,
+            "Nothing waiting",
+            style = HeadlineSerif,
+            color = MaterialTheme.colorScheme.onBackground,
+            textAlign = TextAlign.Center
+        )
+        Spacer(Modifier.height(12.dp))
+        Text(
+            "Tap the mic and say what you've been meaning to do.",
+            style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            textAlign = TextAlign.Center
         )
-        Spacer(Modifier.height(20.dp))
-        Button(onClick = onSpeak) {
-            Icon(Icons.Filled.Mic, contentDescription = null, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(8.dp))
-            Text("Speak a backlog item")
+        Spacer(Modifier.height(18.dp))
+        TextButton(onClick = onType) {
+            Text("Type it instead", color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        Spacer(Modifier.height(10.dp))
-        OutlinedButton(onClick = onAddManually) {
-            Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(8.dp))
-            Text("Or add one by typing")
-        }
-    }
-}
-
-@Composable
-private fun BacklogItemRow(
-    item: BacklogItem,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit,
-    onDone: () -> Unit,
-    onDelete: () -> Unit
-) {
-    ElevatedCard(onClick = onClick, modifier = modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier.padding(16.dp).fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    item.title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Medium
-                )
-                if (item.needsReview) {
-                    Spacer(Modifier.height(2.dp))
-                    Text(
-                        "Needs a quick look — captured without full details",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.error
-                    )
-                }
-                Spacer(Modifier.height(6.dp))
-                AssistRowChips(item)
-            }
-            IconButton(onClick = onDone) {
-                Icon(Icons.Outlined.CheckCircle, contentDescription = "Mark done", tint = MaterialTheme.colorScheme.primary)
-            }
-            IconButton(onClick = onDelete) {
-                Icon(Icons.Filled.Delete, contentDescription = "Delete")
-            }
-        }
-    }
-}
-
-@Composable
-private fun AssistRowChips(item: BacklogItem) {
-    Row {
-        Chip(item.estimatedMinutes.label)
-        Spacer(Modifier.width(6.dp))
-        Chip(item.energy.label)
-        Spacer(Modifier.width(6.dp))
-        Chip(item.category.label)
-    }
-}
-
-@Composable
-private fun Chip(text: String) {
-    Surface(
-        color = MaterialTheme.colorScheme.secondaryContainer,
-        shape = MaterialTheme.shapes.small
-    ) {
-        Text(
-            text,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-            style = MaterialTheme.typography.labelSmall
-        )
+        // No second primary button here: the mic FAB is already the one green
+        // "go" on this screen, and two of them would cancel each other out.
     }
 }
