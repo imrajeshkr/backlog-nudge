@@ -27,7 +27,7 @@ import com.backlognudge.app.detection.UsageTracker
 import com.backlognudge.app.prefs.AppPrefs
 import com.backlognudge.app.ui.theme.BacklogNudgeTheme
 import com.backlognudge.app.ui.theme.BucketStyle
-import com.backlognudge.app.ui.theme.HeadlineSerif
+import com.backlognudge.app.ui.theme.PosterHeadline
 import com.backlognudge.app.ui.theme.LocalExtraColors
 import kotlinx.coroutines.launch
 
@@ -195,8 +195,8 @@ private fun OnboardingScreen(
         AnimatedContent(targetState = step, label = "onboard-step") { current ->
             Column {
                 Text(
-                    current.title,
-                    style = HeadlineSerif,
+                    current.title.uppercase(),
+                    style = PosterHeadline,
                     color = MaterialTheme.colorScheme.onBackground
                 )
                 Spacer(Modifier.height(14.dp))

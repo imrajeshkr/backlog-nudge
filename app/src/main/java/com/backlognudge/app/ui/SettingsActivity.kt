@@ -25,7 +25,7 @@ import com.backlognudge.app.detection.UsageTracker
 import com.backlognudge.app.prefs.AppPrefs
 import com.backlognudge.app.ui.theme.BacklogNudgeTheme
 import com.backlognudge.app.ui.theme.BucketStyle
-import com.backlognudge.app.ui.theme.HeadlineSerif
+import com.backlognudge.app.ui.theme.PosterTitle
 import com.backlognudge.app.ui.theme.LocalExtraColors
 import kotlinx.coroutines.launch
 
@@ -90,8 +90,8 @@ private fun SettingsScreen(prefs: AppPrefs, onBack: () -> Unit) {
                 }
                 Spacer(Modifier.width(4.dp))
                 Text(
-                    "Settings",
-                    style = HeadlineSerif.copy(fontSize = 28.sp, lineHeight = 32.sp),
+                    "SETTINGS",
+                    style = PosterTitle.copy(fontSize = 28.sp, lineHeight = 28.sp),
                     color = MaterialTheme.colorScheme.onBackground
                 )
             }
@@ -240,8 +240,10 @@ private fun requestIgnoreBatteryOptimizations(context: android.content.Context) 
 private fun SectionLabel(text: String) {
     Text(
         text.uppercase(),
+        // Mockup `.sg`: the settings section labels are the one place the
+        // data voice carries the go colour.
         style = BucketStyle,
-        color = LocalExtraColors.current.faint
+        color = MaterialTheme.colorScheme.primary
     )
     Spacer(Modifier.height(12.dp))
 }

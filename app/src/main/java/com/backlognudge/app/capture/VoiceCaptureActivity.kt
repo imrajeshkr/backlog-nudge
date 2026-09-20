@@ -37,7 +37,7 @@ import androidx.lifecycle.lifecycleScope
 import com.backlognudge.app.BacklogNudgeApp
 import com.backlognudge.app.prefs.AppPrefs
 import com.backlognudge.app.ui.theme.BacklogNudgeTheme
-import com.backlognudge.app.ui.theme.TitleSerif
+import com.backlognudge.app.ui.theme.RowTitle
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -222,7 +222,7 @@ private fun VoiceCaptureScreen(
                         // What the user said, in the user's voice: serif.
                         Text(
                             text = partial,
-                            style = TitleSerif.copy(fontSize = 19.sp),
+                            style = RowTitle.copy(fontSize = 19.sp, lineHeight = 24.sp),
                             color = MaterialTheme.colorScheme.onSurface,
                             textAlign = androidx.compose.ui.text.style.TextAlign.Center
                         )

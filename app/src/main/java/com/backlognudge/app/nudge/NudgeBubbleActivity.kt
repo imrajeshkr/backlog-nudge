@@ -11,14 +11,14 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.lifecycleScope
 import com.backlognudge.app.BacklogNudgeApp
 import com.backlognudge.app.data.BacklogItem
 import com.backlognudge.app.data.NudgeResponse
 import com.backlognudge.app.detection.WatchedApps
 import com.backlognudge.app.ui.theme.BacklogNudgeTheme
-import com.backlognudge.app.ui.theme.HeadlineSerif
+import com.backlognudge.app.ui.theme.KickerStyle
+import com.backlognudge.app.ui.theme.PosterTitle
 import com.backlognudge.app.ui.theme.LocalExtraColors
 import com.backlognudge.app.ui.theme.MetaStyle
 import kotlinx.coroutines.launch
@@ -117,15 +117,15 @@ private fun BubbleContent(
             // it's the reason the nudge exists.
             Text(
                 "$sessionMinutes MIN ON ${appName.uppercase()}",
-                style = MetaStyle,
+                style = KickerStyle,
                 color = MaterialTheme.colorScheme.primary
             )
             Spacer(Modifier.height(14.dp))
         }
         // The user's own words.
         Text(
-            item.title,
-            style = HeadlineSerif.copy(fontSize = 30.sp, lineHeight = 34.sp),
+            item.title.uppercase(),
+            style = PosterTitle,
             color = MaterialTheme.colorScheme.onBackground
         )
         Spacer(Modifier.height(8.dp))

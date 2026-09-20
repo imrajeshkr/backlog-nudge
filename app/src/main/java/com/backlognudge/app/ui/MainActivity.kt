@@ -31,12 +31,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.lifecycleScope
@@ -52,11 +48,11 @@ import com.backlognudge.app.prefs.AppPrefs
 import com.backlognudge.app.ui.components.ItemEditDialog
 import com.backlognudge.app.ui.theme.BacklogNudgeTheme
 import com.backlognudge.app.ui.theme.BucketStyle
-import com.backlognudge.app.ui.theme.HeadlineSerif
 import com.backlognudge.app.ui.theme.LocalExtraColors
 import com.backlognudge.app.ui.theme.MetaStyle
-import com.backlognudge.app.ui.theme.TitleSerif
-import com.backlognudge.app.ui.theme.WordmarkSerif
+import com.backlognudge.app.ui.theme.PosterHeadline
+import com.backlognudge.app.ui.theme.PosterTitle
+import com.backlognudge.app.ui.theme.RowTitle
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -275,10 +271,12 @@ fun MainScreen(prefs: AppPrefs) {
     }
 }
 
-/** Plain background, no filled colour bar: "Back" + an italic green "log". */
+/**
+ * Plain background, no filled colour bar. The wordmark is the poster face,
+ * uppercase, in ordinary ink — green is reserved for going and finishing.
+ */
 @Composable
 private fun Wordmark(onHistory: () -> Unit, onSettings: () -> Unit) {
-    val go = MaterialTheme.colorScheme.primary
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -286,11 +284,8 @@ private fun Wordmark(onHistory: () -> Unit, onSettings: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
-            text = buildAnnotatedString {
-                append("Back")
-                withStyle(SpanStyle(fontStyle = FontStyle.Italic, color = go)) { append("log") }
-            },
-            style = WordmarkSerif,
+            text = "BACKLOG",
+            style = PosterTitle,
             color = MaterialTheme.colorScheme.onBackground,
             modifier = Modifier.weight(1f)
         )
@@ -398,7 +393,7 @@ private fun BacklogItemRow(
                 // The user's own words, in the user's voice.
                 Text(
                     item.title,
-                    style = TitleSerif,
+                    style = RowTitle,
                     color = if (completing) extras.faint else MaterialTheme.colorScheme.onBackground,
                     textDecoration = if (completing) TextDecoration.LineThrough else null
                 )
@@ -521,7 +516,7 @@ private fun NudgeHistorySection(recentNudges: List<NudgeEvent>, items: List<Back
                     ) {
                         Text(
                             title,
-                            style = TitleSerif.copy(fontSize = 16.sp),
+                            style = RowTitle.copy(fontSize = 16.sp, lineHeight = 21.sp),
                             color = MaterialTheme.colorScheme.onSurface,
                             modifier = Modifier.weight(1f)
                         )
@@ -554,8 +549,8 @@ private fun EmptyState(onType: () -> Unit) {
         verticalArrangement = Arrangement.Center
     ) {
         Text(
-            "Nothing waiting",
-            style = HeadlineSerif,
+            "NOTHING WAITING",
+            style = PosterHeadline,
             color = MaterialTheme.colorScheme.onBackground,
             textAlign = TextAlign.Center
         )
