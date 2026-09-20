@@ -1,5 +1,26 @@
 # Backlog Nudge — Product Requirements Document
 
+> **Status note (2026-09-20).** This document is the original plan and parts of it
+> are now superseded by what actually shipped. Kept intact because the reasoning
+> is still useful, but read these corrections first:
+>
+> - **No LLM, no network.** The Claude API integration described in §4.1, §6 and
+>   §7 was built and then removed. The app makes zero network calls and the
+>   `INTERNET` permission is gone. Voice capture uses Android's on-device
+>   `SpeechRecognizer`; the transcript is saved as the item title with no
+>   auto-tagging of time/energy/category.
+> - **Native Android, not Tauri.** §6 proposes a Tauri 2.0 cross-platform shell.
+>   What exists is a native Kotlin + Jetpack Compose Android app. iOS, macOS,
+>   Windows and cross-device sync are not built.
+> - **Visual direction.** The app follows the "Green Light" direction: Big
+>   Shoulders Display for headings, Hanken Grotesk for UI, Spline Sans Mono for
+>   durations, with green reserved for exactly two things — going and finishing.
+>
+> Shipped and working: `UsageStatsManager` detection via a foreground service,
+> a continuous-session threshold (default 15 min), a daily-limit fast path
+> (default 60 min, then ~30s re-nudge), and the nudge itself as a Bubbles
+> notification with a full-screen-intent fallback.
+
 ## 1. Problem
 
 Backlog items ("things I'll do when I have free time") die in notes apps because nothing reminds you of them *at the moment you actually have free time* — which is usually the moment you've opened YouTube/Netflix/Instagram instead. The app's job: capture backlog items conversationally, detect "you're currently in low-value idle/entertainment time," and nudge you toward a matching backlog item — without being annoying enough to get disabled in a week.

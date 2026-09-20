@@ -1,5 +1,21 @@
 # Build Plan — Backlog Nudge
 
+> **Status note (2026-09-20).** The phases below are the original plan; the route
+> actually taken diverged. Corrections:
+>
+> - **Phases 0–2 are done, but natively.** There is no Tauri shell and no Claude
+>   API step — the app is native Kotlin + Compose, fully local, with the LLM
+>   parsing built and then deliberately removed.
+> - **Phase 3 (iOS), Phase 4 (sync), Phase 5 (iOS v2) and Phase 6
+>   (distribution) are not started.**
+> - A visual redesign ("Green Light") happened after Phase 2 and isn't
+>   represented in these phases at all.
+>
+> Still open, and genuinely undecided: whether switches/sliders take the accent
+> or stay grey, whether onboarding centres with pips instead of a step counter,
+> and whether the nudge becomes a bottom sheet over the feed rather than a
+> full-screen activity.
+
 Phased by dependency, not calendar time — each phase should be usable/dogfoodable on its own before moving to the next.
 
 ## Phase 0 — Core loop, no OS integration
