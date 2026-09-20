@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.sp
 import com.backlognudge.app.detection.ForegroundWatcherService
 import com.backlognudge.app.detection.UsageTracker
 import com.backlognudge.app.prefs.AppPrefs
+import com.backlognudge.app.prefs.ThemeMode
 import com.backlognudge.app.ui.theme.BacklogNudgeTheme
 import com.backlognudge.app.ui.theme.BucketStyle
 import com.backlognudge.app.ui.theme.PosterTitle
@@ -61,6 +62,7 @@ private fun SettingsScreen(prefs: AppPrefs, onBack: () -> Unit) {
     val threshold by prefs.thresholdMinutes.collectAsState(initial = AppPrefs.DEFAULT_THRESHOLD_MINUTES)
     val dailyLimit by prefs.dailyLimitMinutes.collectAsState(initial = AppPrefs.DEFAULT_DAILY_LIMIT_MINUTES)
     val ttsEnabled by prefs.ttsConfirmEnabled.collectAsState(initial = true)
+    val themeMode by prefs.themeMode.collectAsState(initial = ThemeMode.SYSTEM)
 
     var hasUsageAccess by remember { mutableStateOf(usageTracker.hasUsageAccess()) }
 
@@ -174,6 +176,32 @@ private fun SettingsScreen(prefs: AppPrefs, onBack: () -> Unit) {
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface)
                 ) {
                     Text("Allow")
+                }
+            }
+
+            Spacer(Modifier.height(28.dp))
+            SectionLabel("Appearance")
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                ThemeMode.entries.forEach { mode ->
+                    val selected = themeMode == mode
+                    OutlinedButton(
+                        onClick = { scope.launch { prefs.setThemeMode(mode) } },
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(
+                            1.dp,
+                            if (selected) MaterialTheme.colorScheme.onSurface else LocalExtraColors.current.hairline
+                        ),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = if (selected) {
+                                MaterialTheme.colorScheme.onSurface
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            }
+                        ),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(mode.label)
+                    }
                 }
             }
 

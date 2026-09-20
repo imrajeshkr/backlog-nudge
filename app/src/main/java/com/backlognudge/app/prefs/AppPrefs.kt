@@ -5,6 +5,7 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.backlognudge.app.detection.WatchedApps
@@ -13,12 +14,19 @@ import kotlinx.coroutines.flow.map
 
 private val Context.dataStore by preferencesDataStore(name = "app_prefs")
 
+enum class ThemeMode(val label: String) {
+    SYSTEM("System"),
+    LIGHT("Light"),
+    DARK("Dark")
+}
+
 class AppPrefs(private val context: Context) {
 
     private object Keys {
         val ONBOARDING_COMPLETE = booleanPreferencesKey("onboarding_complete")
         val WATCHER_ENABLED = booleanPreferencesKey("watcher_enabled")
         val THRESHOLD_MINUTES = intPreferencesKey("threshold_minutes")
+        val THEME_MODE = stringPreferencesKey("theme_mode")
         val DAILY_LIMIT_MINUTES = intPreferencesKey("daily_limit_minutes")
         val WATCHED_PACKAGES = stringSetPreferencesKey("watched_packages")
         val LAST_HEARTBEAT = longPreferencesKey("last_heartbeat")
@@ -44,6 +52,17 @@ class AppPrefs(private val context: Context) {
 
     suspend fun setThresholdMinutes(minutes: Int) {
         context.dataStore.edit { it[Keys.THRESHOLD_MINUTES] = minutes }
+    }
+
+    /** Follows the phone unless the user has explicitly picked a side. */
+    val themeMode: Flow<ThemeMode> = context.dataStore.data.map { prefs ->
+        prefs[Keys.THEME_MODE]?.let { stored ->
+            runCatching { ThemeMode.valueOf(stored) }.getOrNull()
+        } ?: ThemeMode.SYSTEM
+    }
+
+    suspend fun setThemeMode(mode: ThemeMode) {
+        context.dataStore.edit { it[Keys.THEME_MODE] = mode.name }
     }
 
     /** Once today's cumulative time in a watched app crosses this, re-opening it nudges almost immediately (see OVER_LIMIT_THRESHOLD_MS) instead of waiting for the full continuous threshold again. */

@@ -8,12 +8,17 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
+import com.backlognudge.app.prefs.AppPrefs
+import com.backlognudge.app.prefs.ThemeMode
 
 /**
  * "Green Light" palette. The app is achromatic — ink, bone and three greys —
@@ -113,9 +118,27 @@ private val LightColors = lightColorScheme(
     scrim = Color(0x99000000)
 )
 
+/**
+ * Resolves the user's Appearance choice, falling back to the phone's setting.
+ * Read here rather than at each call site so every screen and the bubble
+ * follow the preference without threading it through.
+ */
+@Composable
+private fun resolveDarkTheme(): Boolean {
+    val context = LocalContext.current
+    val prefs = remember(context) { AppPrefs(context.applicationContext) }
+    val systemDark = isSystemInDarkTheme()
+    val mode by prefs.themeMode.collectAsState(initial = ThemeMode.SYSTEM)
+    return when (mode) {
+        ThemeMode.LIGHT -> false
+        ThemeMode.DARK -> true
+        ThemeMode.SYSTEM -> systemDark
+    }
+}
+
 @Composable
 fun BacklogNudgeTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    darkTheme: Boolean = resolveDarkTheme(),
     content: @Composable () -> Unit
 ) {
     val colorScheme = if (darkTheme) DarkColors else LightColors
