@@ -12,13 +12,14 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.StartOffset
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -38,6 +39,8 @@ import com.backlognudge.app.BacklogNudgeApp
 import com.backlognudge.app.prefs.AppPrefs
 import com.backlognudge.app.ui.theme.BacklogNudgeTheme
 import com.backlognudge.app.ui.theme.RowTitle
+import com.backlognudge.app.ui.theme.RingCycleMs
+import com.backlognudge.app.ui.theme.reduceMotion
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -219,7 +222,7 @@ private fun VoiceCaptureScreen(
                     )
                     if (partial.isNotBlank() && state != CaptureState.ERROR) {
                         Spacer(Modifier.height(10.dp))
-                        // What the user said, in the user's voice: serif.
+                        // What the user said, echoed back in the UI sans.
                         Text(
                             text = partial,
                             style = RowTitle.copy(fontSize = 19.sp, lineHeight = 24.sp),
@@ -243,20 +246,55 @@ private fun VoiceCaptureScreen(
 
 @Composable
 private fun PulsingMicIcon(active: Boolean) {
-    val transition = rememberInfiniteTransition(label = "mic-pulse")
-    val scale by transition.animateFloat(
-        initialValue = 1f,
-        targetValue = if (active) 1.18f else 1f,
-        animationSpec = infiniteRepeatable(tween(760, easing = LinearEasing), RepeatMode.Reverse),
-        label = "scale"
+    // Mockup `@keyframes ring`: two rings expand from scale(.76) to scale(1.4)
+    // while fading .9 -> 0 over 2.6s, the second delayed half a cycle. The mic
+    // itself does not throb — it sits still and the room moves around it.
+    val transition = rememberInfiniteTransition(label = "mic-halo")
+    val go = MaterialTheme.colorScheme.primary
+    val reduced = reduceMotion()
+
+    // Both rings are always composed — gating the animateFloat call itself
+    // would change the composition shape between recompositions.
+    val r1 by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(RingCycleMs, easing = LinearEasing)
+        ),
+        label = "ring-a"
     )
-    Box(
-        modifier = Modifier
-            .size(60.dp)
-            .graphicsLayer { scaleX = scale; scaleY = scale }
-            .background(MaterialTheme.colorScheme.primary, CircleShape),
-        contentAlignment = Alignment.Center
-    ) {
-        Icon(Icons.Filled.Mic, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimary)
+    val r2 by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(RingCycleMs, easing = LinearEasing),
+            initialStartOffset = StartOffset(RingCycleMs / 2)
+        ),
+        label = "ring-b"
+    )
+
+    val show = active && !reduced
+    Box(modifier = Modifier.size(104.dp), contentAlignment = Alignment.Center) {
+        listOf(r1, r2).forEach { p ->
+            val scale = 0.76f + (1.4f - 0.76f) * p
+            Box(
+                modifier = Modifier
+                    .size(76.dp)
+                    .graphicsLayer {
+                        scaleX = scale
+                        scaleY = scale
+                        alpha = if (show) 0.9f * (1f - p) else 0f
+                    }
+                    .border(1.5.dp, go, CircleShape)
+            )
+        }
+        Box(
+            modifier = Modifier
+                .size(60.dp)
+                .background(go, CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(Icons.Filled.Mic, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimary)
+        }
     }
 }

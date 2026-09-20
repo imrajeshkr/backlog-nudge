@@ -12,6 +12,9 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -28,6 +31,8 @@ import com.backlognudge.app.prefs.AppPrefs
 import com.backlognudge.app.ui.theme.BacklogNudgeTheme
 import com.backlognudge.app.ui.theme.BucketStyle
 import com.backlognudge.app.ui.theme.PosterHeadline
+import com.backlognudge.app.ui.theme.SceneFadeMs
+import com.backlognudge.app.ui.theme.motionTween
 import com.backlognudge.app.ui.theme.LocalExtraColors
 import kotlinx.coroutines.launch
 
@@ -192,8 +197,19 @@ private fun OnboardingScreen(
             color = extras.faint
         )
         Spacer(Modifier.weight(1f))
-        AnimatedContent(targetState = step, label = "onboard-step") { current ->
-            Column {
+        // Mockup `.scene`: a plain opacity crossfade, .3s. No slide, no scale.
+        // transitionSpec isn't a @Composable scope, so the spec is hoisted.
+        val fadeSpec = motionTween<Float>(SceneFadeMs)
+        // A fixed floor under the copy block so the heading keeps the same
+        // baseline on every step. Without it the shortest step sits ~30dp
+        // higher than the longest and the headline visibly hops mid-crossfade.
+        AnimatedContent(
+            targetState = step,
+            transitionSpec = { fadeIn(fadeSpec) togetherWith fadeOut(fadeSpec) },
+            label = "onboard-step",
+            modifier = Modifier.heightIn(min = 200.dp)
+        ) { current ->
+            Column(modifier = Modifier.fillMaxWidth()) {
                 Text(
                     current.title.uppercase(),
                     style = PosterHeadline,

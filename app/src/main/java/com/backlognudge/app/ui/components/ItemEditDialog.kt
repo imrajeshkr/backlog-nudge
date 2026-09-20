@@ -29,7 +29,8 @@ fun ItemEditDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (initial == null) "Add backlog item" else "Edit item") },
+        // The poster face is never set in sentence case.
+        title = { Text(if (initial == null) "ADD BACKLOG ITEM" else "EDIT ITEM") },
         text = {
             Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                 OutlinedTextField(

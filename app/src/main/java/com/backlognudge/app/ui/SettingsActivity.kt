@@ -9,6 +9,8 @@ import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -18,6 +20,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.backlognudge.app.detection.ForegroundWatcherService
@@ -203,7 +206,12 @@ private fun quietSwitchColors() = SwitchDefaults.colors(
 /**
  * The slider's track is chrome, not a "go" action, so the filled portion is a
  * grey; only the thumb picks up the accent to show where you are.
+ *
+ * Shape follows the mockup's `.trk`: a 4px hairline with a small round thumb
+ * and no tick marks. M3's stock slider draws a thick bar with a dot per step,
+ * which reads as a completely different control.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun QuietSlider(
     value: Float,
@@ -211,18 +219,49 @@ private fun QuietSlider(
     valueRange: ClosedFloatingPointRange<Float>,
     steps: Int
 ) {
+    val activeColor = MaterialTheme.colorScheme.onSurfaceVariant
+    val inactiveColor = MaterialTheme.colorScheme.surfaceVariant
+    val thumbColor = MaterialTheme.colorScheme.onSurface
+
     Slider(
         value = value,
         onValueChange = onValueChange,
         valueRange = valueRange,
+        // No stepping dots: the mockup's track is unbroken.
         steps = steps,
         colors = SliderDefaults.colors(
-            thumbColor = MaterialTheme.colorScheme.onSurface,
-            activeTrackColor = MaterialTheme.colorScheme.onSurfaceVariant,
-            inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant,
-            activeTickColor = MaterialTheme.colorScheme.surfaceVariant,
-            inactiveTickColor = MaterialTheme.colorScheme.surfaceVariant
-        )
+            thumbColor = thumbColor,
+            activeTrackColor = activeColor,
+            inactiveTrackColor = inactiveColor,
+            activeTickColor = Color.Transparent,
+            inactiveTickColor = Color.Transparent
+        ),
+        thumb = {
+            Box(
+                modifier = Modifier
+                    .size(14.dp)
+                    .background(thumbColor, CircleShape)
+            )
+        },
+        track = { state ->
+            val fraction = if (state.valueRange.endInclusive > state.valueRange.start) {
+                ((state.value - state.valueRange.start) /
+                    (state.valueRange.endInclusive - state.valueRange.start)).coerceIn(0f, 1f)
+            } else 0f
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(4.dp)
+                    .background(inactiveColor, RoundedCornerShape(2.dp))
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(fraction)
+                        .height(4.dp)
+                        .background(activeColor, RoundedCornerShape(2.dp))
+                )
+            }
+        }
     )
 }
 

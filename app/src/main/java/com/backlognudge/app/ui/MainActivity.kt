@@ -29,8 +29,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
@@ -50,6 +50,9 @@ import com.backlognudge.app.ui.theme.BacklogNudgeTheme
 import com.backlognudge.app.ui.theme.BucketStyle
 import com.backlognudge.app.ui.theme.LocalExtraColors
 import com.backlognudge.app.ui.theme.MetaStyle
+import com.backlognudge.app.ui.theme.Pop
+import com.backlognudge.app.ui.theme.SceneFadeMs
+import com.backlognudge.app.ui.theme.motionTween
 import com.backlognudge.app.ui.theme.PosterHeadline
 import com.backlognudge.app.ui.theme.PosterTitle
 import com.backlognudge.app.ui.theme.RowTitle
@@ -359,9 +362,18 @@ private fun BacklogItemRow(
         }
     )
 
+    // Mockup `.row.done`: the row fades to 42% and the title strikes through.
+    // It does not collapse out from under the finger — the list reflows only
+    // once the row actually leaves the database.
+    val rowAlpha by animateFloatAsState(
+        targetValue = if (completing) 0.42f else 1f,
+        animationSpec = motionTween(SceneFadeMs),
+        label = "row-done-fade"
+    )
+
     SwipeToDismissBox(
         state = dismissState,
-        modifier = modifier,
+        modifier = modifier.graphicsLayer { alpha = rowAlpha },
         backgroundContent = {
             val goingRight = dismissState.dismissDirection == SwipeToDismissBoxValue.StartToEnd
             val bg = if (goingRight) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
@@ -375,7 +387,20 @@ private fun BacklogItemRow(
                     .padding(horizontal = 20.dp),
                 contentAlignment = if (goingRight) Alignment.CenterStart else Alignment.CenterEnd
             ) {
-                Text(if (goingRight) "DONE" else "SNOOZE 30M", style = MetaStyle, color = fg)
+                // The label only appears once the swipe has uncovered enough
+                // room for it. Without this it tears against the moving row
+                // and reads "NOOZE 30M" for the first third of the gesture.
+                val revealed = kotlin.math.abs(
+                    runCatching { dismissState.requireOffset() }.getOrDefault(0f)
+                )
+                val labelAlpha = ((revealed - 180f) / 140f).coerceIn(0f, 1f)
+                Text(
+                    if (goingRight) "DONE" else "SNOOZE 30M",
+                    style = MetaStyle,
+                    color = fg,
+                    maxLines = 1,
+                    modifier = Modifier.graphicsLayer { alpha = labelAlpha }
+                )
             }
         }
     ) {
@@ -415,36 +440,48 @@ private fun CompletionTick(completing: Boolean, onTap: () -> Unit) {
     val go = MaterialTheme.colorScheme.primary
     val fill by animateColorAsState(
         targetValue = if (completing) go else Color.Transparent,
-        animationSpec = tween(180),
+        animationSpec = motionTween(250),
         label = "tick-fill"
     )
     val ring by animateColorAsState(
         targetValue = if (completing) go else extras.faint,
-        animationSpec = tween(180),
+        animationSpec = motionTween(250),
         label = "tick-ring"
     )
-    val scale by animateFloatAsState(
-        targetValue = if (completing) 1.18f else 1f,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
-        label = "tick-scale"
+    // Mockup `.tick svg`: transform .25s cubic-bezier(.3,1.6,.5,1) from
+    // scale(.4), opacity .2s. The glyph overshoots; the ring itself stays put.
+    val glyphScale by animateFloatAsState(
+        targetValue = if (completing) 1f else 0.4f,
+        animationSpec = motionTween(250, Pop),
+        label = "tick-glyph-scale"
+    )
+    val glyphAlpha by animateFloatAsState(
+        targetValue = if (completing) 1f else 0f,
+        animationSpec = motionTween(200),
+        label = "tick-glyph-alpha"
     )
     Box(
         modifier = Modifier
             .padding(top = 3.dp)
             .size(24.dp)
-            .scale(scale)
             .clip(CircleShape)
             .background(fill)
             .border(1.5.dp, ring, CircleShape)
             .clickable(onClick = onTap),
         contentAlignment = Alignment.Center
     ) {
-        if (completing) {
+        if (glyphAlpha > 0f) {
             Icon(
                 Icons.Filled.Check,
                 contentDescription = "Done",
                 tint = MaterialTheme.colorScheme.onPrimary,
-                modifier = Modifier.size(15.dp)
+                modifier = Modifier
+                    .size(15.dp)
+                    .graphicsLayer {
+                        alpha = glyphAlpha
+                        scaleX = glyphScale
+                        scaleY = glyphScale
+                    }
             )
         }
     }

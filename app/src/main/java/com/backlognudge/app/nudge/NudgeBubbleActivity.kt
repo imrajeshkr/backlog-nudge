@@ -10,6 +10,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.lifecycleScope
 import com.backlognudge.app.BacklogNudgeApp
@@ -17,7 +18,11 @@ import com.backlognudge.app.data.BacklogItem
 import com.backlognudge.app.data.NudgeResponse
 import com.backlognudge.app.detection.WatchedApps
 import com.backlognudge.app.ui.theme.BacklogNudgeTheme
+import androidx.compose.animation.core.animateFloatAsState
+import com.backlognudge.app.ui.theme.Glide
 import com.backlognudge.app.ui.theme.KickerStyle
+import com.backlognudge.app.ui.theme.SceneFadeMs
+import com.backlognudge.app.ui.theme.motionTween
 import com.backlognudge.app.ui.theme.PosterTitle
 import com.backlognudge.app.ui.theme.LocalExtraColors
 import com.backlognudge.app.ui.theme.MetaStyle
@@ -106,9 +111,33 @@ private fun BubbleContent(
     onDismiss: () -> Unit
 ) {
     val extras = LocalExtraColors.current
+
+    // NOTE: twentytwo.html specifies no entrance for `.sheet` — it is simply
+    // present. A nudge that materialises with no motion at all reads as a
+    // glitch on a real device, so the card rises a short distance and fades
+    // in on the file's own `.4,0,.2,1` curve. This is the one piece of motion
+    // here that is an addition rather than a transcription; if the design
+    // wants it dead still, delete this block.
+    var entered by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { entered = true }
+    val enterAlpha by animateFloatAsState(
+        targetValue = if (entered) 1f else 0f,
+        animationSpec = motionTween(SceneFadeMs),
+        label = "sheet-fade"
+    )
+    val enterShift by animateFloatAsState(
+        targetValue = if (entered) 0f else 28f,
+        animationSpec = motionTween(360, Glide),
+        label = "sheet-rise"
+    )
+
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .graphicsLayer {
+                alpha = enterAlpha
+                translationY = enterShift * density
+            }
             .padding(horizontal = 24.dp, vertical = 28.dp),
         verticalArrangement = Arrangement.Center
     ) {
@@ -130,7 +159,7 @@ private fun BubbleContent(
         )
         Spacer(Modifier.height(8.dp))
         Text(
-            "TAKES ${item.estimatedMinutes.minutes} MIN",
+            "TAKES ${item.estimatedMinutes.label.uppercase()}",
             style = MetaStyle,
             color = extras.faint
         )
