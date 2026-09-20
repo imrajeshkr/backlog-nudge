@@ -3,4 +3,11 @@
          and is applied in Compose (see ui/theme/Theme.kt), never as window chrome. -->
     <color name="bg_night">#0C100E</color>
     <color name="bg_paper">#F1EFE8</color>
+
+    <!-- The one accent the notification is allowed, mirroring Theme.kt's
+         LightGo. values-night carries DarkGo. The system draws the
+         notification background, so this pair is what keeps the accent
+         legible on both. -->
+    <color name="nudge_accent">#11683F</color>
+
 </resources>

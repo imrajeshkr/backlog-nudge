@@ -1,0 +1,4 @@
+<resources>
+    <!-- Theme.kt DarkGo. See values/colors.xml. -->
+    <color name="nudge_accent">#3FD98B</color>
+</resources>

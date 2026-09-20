@@ -6,15 +6,18 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.drawable.Icon
 import android.os.Build
+import android.widget.RemoteViews
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.Person
 import androidx.core.content.pm.ShortcutInfoCompat
 import androidx.core.content.pm.ShortcutManagerCompat
+import androidx.core.content.ContextCompat
 import androidx.core.graphics.drawable.IconCompat
 import com.backlognudge.app.BacklogNudgeApp
 import com.backlognudge.app.R
 import com.backlognudge.app.data.BacklogItem
+import com.backlognudge.app.detection.WatchedApps
 import com.backlognudge.app.ui.MainActivity
 
 /**
@@ -50,11 +53,33 @@ object NudgeNotifier {
 
         val contentPendingIntent = bubbleContentIntent(context, item.id, eventId, watchedPackage, sessionMinutes, notificationId)
 
+        // The app's own type, as far as the platform allows. SystemUI still
+        // owns the background, the corner radius, the header row and the
+        // action buttons; DecoratedCustomViewStyle lets us supply only the
+        // middle block. Title/text are still set so that anything which
+        // ignores the custom view (Wear, Auto, some launchers, the
+        // notification log) still reads correctly.
+        val collapsed = RemoteViews(context.packageName, R.layout.notification_nudge).apply {
+            setTextViewText(R.id.nudge_title, itemHeadline(item))
+            setTextViewText(R.id.nudge_body, nudgeCopy)
+        }
+        val expanded = RemoteViews(context.packageName, R.layout.notification_nudge_big).apply {
+            setTextViewText(R.id.nudge_chip, durationChip(item, watchedPackage, sessionMinutes))
+            setTextViewText(R.id.nudge_title, itemHeadline(item))
+            setTextViewText(R.id.nudge_body, nudgeCopy)
+        }
+
         val builder = NotificationCompat.Builder(context, BacklogNudgeApp.CHANNEL_NUDGE)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(itemHeadline(item))
             .setContentText(nudgeCopy)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(nudgeCopy))
+            // Tints the small icon and the app name in the header. Note that
+            // setColorized() is only honoured for foreground-service
+            // notifications, so it is deliberately not set here.
+            .setColor(ContextCompat.getColor(context, R.color.nudge_accent))
+            .setCustomContentView(collapsed)
+            .setCustomBigContentView(expanded)
+            .setStyle(NotificationCompat.DecoratedCustomViewStyle())
             .setCategory(NotificationCompat.CATEGORY_REMINDER)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setAutoCancel(true)
@@ -115,6 +140,14 @@ object NudgeNotifier {
     // the LLM-generated line) carries the "why now" framing - keeping these distinct
     // avoids the title and body both asking the same "got N min?" question.
     private fun itemHeadline(item: BacklogItem): String = item.title
+
+    /** The mockup's `.slb` kicker, e.g. "22 MIN ON INSTAGRAM · TAKES 15 MIN". */
+    private fun durationChip(item: BacklogItem, watchedPackage: String, sessionMinutes: Int): String {
+        val takes = "TAKES ${item.estimatedMinutes.label.uppercase()}"
+        if (sessionMinutes <= 0) return takes
+        val where = WatchedApps.friendlyName(watchedPackage).uppercase()
+        return "$sessionMinutes MIN ON $where · $takes"
+    }
 
     private fun bubblesAllowed(context: Context, nm: NotificationManager): Boolean =
         runCatching { nm.areBubblesAllowed() }.getOrDefault(false)
